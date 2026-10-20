@@ -108,14 +108,13 @@ favSearchInput.addEventListener('input', (e) => {
     }, 250);
 });
 
-// AGREGAR AL INICIO CON .unshift()
+// AGREGAR AL INICIO
 window.addFavorite = function(id, type, title) {
     if (myFavorites.some(f => f.id === id && f.type === type)) {
         favSearchInput.value = '';
         favSuggestions.classList.add('hidden');
         return;
     }
-    // unshift coloca el nuevo elemento de primero
     myFavorites.unshift({ id, type, title });
     localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
     favSearchInput.value = '';
@@ -151,39 +150,73 @@ function renderFavorites() {
     `).join('');
 }
 
-// GENERAR RECOMENDACIONES POR GÉNERO
+// ALGORITMO DIVERSIFICADO Y ANTI-SAGA
 async function generateSmartRecommendations() {
     if (myFavorites.length === 0 || !API_KEY) return;
-    recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Buscando recomendaciones basadas en tus favoritas...</p>';
+    recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Analizando tus gustos con balance equitativo...</p>';
 
     try {
-        let recommendedItemsMap = new Map();
+        // Palabras clave de las favoritas para bloquear secuelas directas de la misma saga
+        const favoriteKeywords = myFavorites.map(f => {
+            return f.title.toLowerCase().replace(/[:\-0-9]/g, '').trim().split(' ')[0];
+        }).filter(w => w.length > 3);
 
-        for (let fav of myFavorites) {
-            const res = await fetch(`${BASE_URL}/${fav.type}/${fav.id}/recommendations?api_key=${API_KEY}&language=es-ES`);
-            const data = await res.json();
-            if (data.results) {
-                data.results.forEach(item => {
-                    if (!myFavorites.some(f => f.id === item.id)) {
-                        recommendedItemsMap.set(item.id, { ...item, media_type: fav.type });
-                    }
+        let candidatesPool = [];
+
+        // Consultamos en paralelo recomendaciones y similares para cada una de tus favoritas
+        const fetchPromises = myFavorites.map(async (fav) => {
+            try {
+                const [recsRes, simRes] = await Promise.all([
+                    fetch(`${BASE_URL}/${fav.type}/${fav.id}/recommendations?api_key=${API_KEY}&language=es-ES`),
+                    fetch(`${BASE_URL}/${fav.type}/${fav.id}/similar?api_key=${API_KEY}&language=es-ES`)
+                ]);
+                const recsData = await recsRes.json();
+                const simData = await simRes.json();
+
+                const combined = [...(recsData.results || []), ...(simData.results || [])];
+
+                // Filtramos que no sea la misma favorita y que no sea una secuela evidente
+                const filtered = combined.filter(item => {
+                    const itemTitle = (item.title || item.name || '').toLowerCase();
+                    const isAlreadyFav = myFavorites.some(f => f.id === item.id);
+                    const isSameFranchise = favoriteKeywords.some(kw => itemTitle.includes(kw));
+                    return !isAlreadyFav && !isSameFranchise;
                 });
+
+                // Tomamos hasta 6 títulos variados por cada favorita para que ninguna predomine
+                return filtered.slice(0, 6).map(item => ({ ...item, media_type: fav.type }));
+            } catch (err) {
+                return [];
+            }
+        });
+
+        const resultsByFavorite = await Promise.all(fetchPromises);
+
+        // Mezcla entrelazada (Round-Robin) para dar exactamente el mismo peso a todas tus favoritas
+        let maxLen = Math.max(...resultsByFavorite.map(arr => arr.length));
+        let seenIds = new Set();
+
+        for (let i = 0; i < maxLen; i++) {
+            for (let list of resultsByFavorite) {
+                if (list[i] && !seenIds.has(list[i].id)) {
+                    seenIds.add(list[i].id);
+                    candidatesPool.push(list[i]);
+                }
             }
         }
 
-        let allRecs = Array.from(recommendedItemsMap.values());
-
-        if (allRecs.length === 0) {
-            recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">No hay suficientes recomendaciones disponibles aún.</p>';
+        if (candidatesPool.length === 0) {
+            recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">No se hallaron recomendaciones distintas. ¡Prueba agregando otras series o películas!</p>';
             return;
         }
 
+        // Catálogo de géneros
         const genreRes = await fetch(`${BASE_URL}/genre/movie/list?api_key=${API_KEY}&language=es-ES`);
         const genreData = await genreRes.json();
         const genreMap = new Map(genreData.genres.map(g => [g.id, g.name]));
 
         let groupedByGenre = {};
-        allRecs.forEach(item => {
+        candidatesPool.forEach(item => {
             const genreIds = item.genre_ids || [];
             genreIds.forEach(gId => {
                 const genreName = genreMap.get(gId) || 'Otros';
@@ -211,12 +244,12 @@ async function generateSmartRecommendations() {
         }
 
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Error generando recomendaciones:", error);
         recommendationsContainer.innerHTML = '<p class="text-center text-red-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Ocurrió un error al calcular tus recomendaciones.</p>';
     }
 }
 
-// RENDERIZAR TARJETAS CON ETIQUETAS VERDE/NARANJA AL LADO DEL TÍTULO
+// RENDERIZAR TARJETAS
 function displayMediaCards(items, container) {
     container.innerHTML = '';
     items.forEach(item => {
@@ -226,7 +259,6 @@ function displayMediaCards(items, container) {
         const poster = poster_path ? `${IMG_URL}${poster_path}` : 'https://via.placeholder.com/500x750?text=Sin+Imagen';
         const realType = media_type || (title ? 'movie' : 'tv');
 
-        // Color verde para Serie y naranja para Película
         const typeBadge = realType === 'tv' 
             ? '<span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-1.5 py-0.5 rounded">Serie</span>' 
             : '<span class="text-[10px] font-bold text-amber-500 bg-amber-950/60 border border-amber-800/60 px-1.5 py-0.5 rounded">Película</span>';
@@ -263,7 +295,6 @@ async function fetchMediaDetails(id, type) {
         let data = await resData.json();
         let providersData = await resProviders.json();
 
-        // Buscar proveedores disponibles en tu región o globales
         const results = providersData.results || {};
         const localProviders = results.PE || results.MX || results.ES || results.US || {};
         const flatrate = localProviders.flatrate || localProviders.buy || [];
@@ -278,7 +309,6 @@ async function fetchMediaDetails(id, type) {
     } catch (e) { console.error(e); }
 }
 
-// HTML DE PLATAFORMAS DÓNDE VERLO
 function getProvidersHtml(providers) {
     if (!providers || providers.length === 0) {
         return '<p class="text-xs text-zinc-500 italic">No hay plataformas de streaming registradas para tu región.</p>';
@@ -295,13 +325,12 @@ function getProvidersHtml(providers) {
     `;
 }
 
-// MODAL PARA PELÍCULAS CON BOTONES DE TRAILER Y CRÍTICA EN YOUTUBE
+// MODAL PARA PELÍCULAS
 function showMovieModal(movie, providers) {
     const backdrop = movie.backdrop_path ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}` : '';
     const rating = movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A';
     const voteCount = movie.vote_count ? movie.vote_count.toLocaleString() : '0';
 
-    // Enlaces de búsqueda en YouTube
     const trailerSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' trailer espanol latino')}`;
     const reviewSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' critica reseña')}`;
 
@@ -315,7 +344,6 @@ function showMovieModal(movie, providers) {
         </div>
 
         <div class="space-y-5 text-sm text-zinc-300">
-            <!-- Calificación del Público -->
             <div class="flex items-center gap-3 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
                 <span class="text-xl">⭐</span>
                 <div>
@@ -324,13 +352,11 @@ function showMovieModal(movie, providers) {
                 </div>
             </div>
 
-            <!-- Dónde Ver -->
             <div class="space-y-2">
                 <h4 class="text-xs font-bold text-zinc-200 uppercase tracking-wider">Dónde ver</h4>
                 ${getProvidersHtml(providers)}
             </div>
 
-            <!-- Sinopsis -->
             <div class="space-y-1.5">
                 <h4 class="text-xs font-bold text-zinc-200 uppercase tracking-wider">Sinopsis</h4>
                 <p class="leading-relaxed text-zinc-400 text-xs sm:text-sm">${movie.overview || 'Sin descripción disponible.'}</p>
@@ -341,7 +367,6 @@ function showMovieModal(movie, providers) {
                 <span>Estreno: <strong>${movie.release_date || 'N/A'}</strong></span>
             </div>
 
-            <!-- Botones Elegantes de YouTube -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <a href="${trailerSearchUrl}" target="_blank" rel="noopener noreferrer" class="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg">
                     <span>▶ Ver Trailer en YouTube (Latino)</span>
@@ -355,7 +380,7 @@ function showMovieModal(movie, providers) {
     detailModal.classList.remove('hidden');
 }
 
-// MODAL PARA SERIES CON MAPA DE CALOR, BOTÓN TRAILER POR TEMPORADA Y CRÍTICA
+// MODAL PARA SERIES
 async function showTvModal(tv, providers) {
     const backdrop = tv.backdrop_path ? `https://image.tmdb.org/t/p/original${tv.backdrop_path}` : '';
     const rating = tv.vote_average ? tv.vote_average.toFixed(1) : 'N/A';
@@ -375,7 +400,6 @@ async function showTvModal(tv, providers) {
         </div>
 
         <div class="space-y-5 text-sm text-zinc-300">
-            <!-- Calificación del Público -->
             <div class="flex items-center gap-3 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
                 <span class="text-xl">⭐</span>
                 <div>
@@ -384,19 +408,16 @@ async function showTvModal(tv, providers) {
                 </div>
             </div>
 
-            <!-- Dónde Ver -->
             <div class="space-y-2">
                 <h4 class="text-xs font-bold text-zinc-200 uppercase tracking-wider">Dónde ver</h4>
                 ${getProvidersHtml(providers)}
             </div>
 
-            <!-- Sinopsis -->
             <div class="space-y-1.5">
                 <h4 class="text-xs font-bold text-zinc-200 uppercase tracking-wider">Sinopsis</h4>
                 <p class="leading-relaxed text-zinc-400 text-xs sm:text-sm">${tv.overview || 'Sin descripción disponible.'}</p>
             </div>
 
-            <!-- Botones a YouTube -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <a id="seasonTrailerBtn" href="https://www.youtube.com/results?search_query=${encodeURIComponent(tv.name + ' temporada 1 trailer espanol latino')}" target="_blank" rel="noopener noreferrer" class="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg">
                     <span>▶ Ver Trailer Temporada 1 (Latino)</span>
@@ -406,7 +427,6 @@ async function showTvModal(tv, providers) {
                 </a>
             </div>
 
-            <!-- Mapa de Calor de Episodios -->
             <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <h3 class="font-bold text-sm sm:text-base text-zinc-100">Calificaciones por Episodio</h3>
@@ -421,7 +441,6 @@ async function showTvModal(tv, providers) {
     detailModal.classList.remove('hidden');
     loadSeasonEpisodes(tv.id, 1);
 
-    // Cambiar temporada: actualiza los episodios y el enlace del botón de trailer
     document.getElementById('seasonSelect').addEventListener('change', (e) => {
         const seasonNum = e.target.value;
         loadSeasonEpisodes(tv.id, seasonNum);
