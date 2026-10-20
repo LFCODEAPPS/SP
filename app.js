@@ -1,8 +1,30 @@
+// --- FUNCIÓN GLOBAL DE APERTURA DEL MENÚ (A prueba de fallos) ---
+window.toggleMenu = function(e) {
+    if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+    }
+    const menu = document.getElementById('menuDropdown');
+    if (menu) {
+        menu.classList.toggle('hidden');
+    }
+};
+
+// Cerrar menú al hacer clic en el fondo de la página
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('menuDropdown');
+    const btn = document.getElementById('menuBtn');
+    if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.add('hidden');
+    }
+    const suggestions = document.getElementById('favSuggestions');
+    if (suggestions) {
+        suggestions.classList.add('hidden');
+    }
+});
+
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_URL = 'https://image.tmdb.org/t/p/w500';
-
-const menuBtn = document.getElementById('menuBtn');
-const menuDropdown = document.getElementById('menuDropdown');
 
 const favSearchInput = document.getElementById('favSearchInput');
 const favSuggestions = document.getElementById('favSuggestions');
@@ -18,7 +40,10 @@ const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
 
 // Estado
 let API_KEY = localStorage.getItem('tmdb_api_key') || '';
-let myFavorites = JSON.parse(localStorage.getItem('fernando_favorites')) || [];
+let rawFavorites = JSON.parse(localStorage.getItem('fernando_favorites')) || [];
+
+// Sanitización para limpiar datos guardados en versiones anteriores
+let myFavorites = rawFavorites.filter(item => item && typeof item === 'object' && item.id && item.type);
 
 if (API_KEY) {
     apiKeyInput.value = API_KEY;
@@ -30,33 +55,14 @@ if (API_KEY) {
     recommendationsContainer.innerHTML = '<p class="text-center text-amber-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">Haz clic en el botón hamburguesa <strong>(≡)</strong> arriba a la derecha para ingresar tu TMDB API Key.</p>';
 }
 
-// Abrir / Cerrar Menú Hamburguesa con soporte táctil completo (click y touchend)
-function toggleMenu(e) {
-    e.stopPropagation();
-    e.preventDefault();
-    menuDropdown.classList.toggle('hidden');
-}
-
-menuBtn.addEventListener('click', toggleMenu);
-menuBtn.addEventListener('touchend', toggleMenu);
-
-// Evitar que hacer clic dentro del menú lo cierre por accidente
-menuDropdown.addEventListener('click', (e) => e.stopPropagation());
-menuDropdown.addEventListener('touchend', (e) => e.stopPropagation());
-
-// Cerrar menú si se hace clic fuera
-document.addEventListener('click', () => {
-    menuDropdown.classList.add('hidden');
-    favSuggestions.classList.add('hidden');
-});
-
 // Guardar API Key
 saveApiKeyBtn.addEventListener('click', () => {
     const key = apiKeyInput.value.trim();
     if (key) {
         localStorage.setItem('tmdb_api_key', key);
         API_KEY = key;
-        menuDropdown.classList.add('hidden');
+        const menu = document.getElementById('menuDropdown');
+        if (menu) menu.classList.add('hidden');
         alert('¡API Key guardada con éxito!');
         renderFavorites();
         if (myFavorites.length > 0) generateSmartRecommendations();
@@ -65,7 +71,7 @@ saveApiKeyBtn.addEventListener('click', () => {
     }
 });
 
-// BUSCADOR DINÁMICO DENTRO DEL MENÚ
+// BUSCADOR EN EL MENÚ
 let favSearchTimeout;
 favSearchInput.addEventListener('input', (e) => {
     clearTimeout(favSearchTimeout);
@@ -129,7 +135,6 @@ window.removeFavorite = function(id, type) {
     }
 };
 
-// RENDERIZAR LISTA DENTRO DEL MENÚ
 function renderFavorites() {
     if (myFavorites.length === 0) {
         myFavoritesList.innerHTML = '<p class="text-xs text-zinc-500 italic text-center py-2">No hay elementos registrados.</p>';
@@ -146,7 +151,6 @@ function renderFavorites() {
     `).join('');
 }
 
-// GENERAR RECOMENDACIONES POR GÉNERO
 async function generateSmartRecommendations() {
     if (myFavorites.length === 0 || !API_KEY) return;
     recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Analizando tus gustos y buscando recomendaciones por género...</p>';
@@ -211,7 +215,6 @@ async function generateSmartRecommendations() {
     }
 }
 
-// RENDERIZAR TARJETAS
 function displayMediaCards(items, container) {
     container.innerHTML = '';
     items.forEach(item => {
@@ -239,7 +242,6 @@ function displayMediaCards(items, container) {
     });
 }
 
-// DETALLES Y MAPA DE CALOR
 async function fetchMediaDetails(id, type) {
     try {
         let endpoint = `${BASE_URL}/${type}/${id}`;
@@ -300,7 +302,7 @@ async function showTvModal(tv, trailerKey) {
                 </div>
             </div>
 
-            ${trailerKey ? `<div class="mt-4"><h4 class="font-bold text-zinc-200 mb-2">Trailer Oficial</h4><div class="aspect-video w-full rounded-xl overflow-hidden bg-black"><iframe src="https://www.youtube.com/embed/${trailerKey}" class="w-full h-full" frameborder="0" allowfullscreen></iframe></div></div>` : ''}
+            ${trailerKey ? `<div class="mt-4"><h4 class="font-bold text-zinc-200 mb-2">Trailer Oficial</h4><div class="aspect-video w-full rounded-lg overflow-hidden bg-black"><iframe src="https://www.youtube.com/embed/${trailerKey}" class="w-full h-full" frameborder="0" allowfullscreen></iframe></div></div>` : ''}
         </div>
     `;
     detailModal.classList.remove('hidden');
