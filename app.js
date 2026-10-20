@@ -1,15 +1,6 @@
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_URL = 'https://image.tmdb.org/t/p/w500';
 
-const moviesGrid = document.getElementById('moviesGrid');
-const searchInput = document.getElementById('searchInput');
-const sectionTitle = document.getElementById('sectionTitle');
-
-const tabCatalog = document.getElementById('tabCatalog');
-const tabRecommendations = document.getElementById('tabRecommendations');
-const viewCatalog = document.getElementById('viewCatalog');
-const viewRecommendations = document.getElementById('viewRecommendations');
-
 const favSearchInput = document.getElementById('favSearchInput');
 const favSuggestions = document.getElementById('favSuggestions');
 const myFavoritesList = document.getElementById('myFavoritesList');
@@ -30,10 +21,12 @@ let myFavorites = JSON.parse(localStorage.getItem('fernando_favorites')) || [];
 
 if (API_KEY) {
     apiKeyInput.value = API_KEY;
-    fetchTrendingMedia();
     renderFavorites();
+    if (myFavorites.length > 0) {
+        generateSmartRecommendations();
+    }
 } else {
-    moviesGrid.innerHTML = '<p class="text-amber-400 col-span-full text-center py-10">Haz clic en el icono <strong>⚙️</strong> arriba a la derecha para ingresar tu API Key.</p>';
+    recommendationsContainer.innerHTML = '<p class="text-center text-amber-400 py-16">Haz clic en el icono <strong>⚙️</strong> arriba a la derecha para ingresar tu TMDB API Key.</p>';
 }
 
 // Configuración API Key
@@ -53,98 +46,19 @@ saveApiKeyBtn.addEventListener('click', () => {
         API_KEY = key;
         configMenu.classList.add('hidden');
         alert('¡API Key guardada!');
-        fetchTrendingMedia();
+        renderFavorites();
+        if (myFavorites.length > 0) generateSmartRecommendations();
     } else {
         alert('Introduce una clave válida.');
     }
 });
 
-// Navegación entre Pestañas
-tabCatalog.addEventListener('click', () => {
-    tabCatalog.className = "px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white transition cursor-pointer";
-    tabRecommendations.className = "px-4 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition cursor-pointer";
-    viewCatalog.classList.remove('hidden');
-    viewRecommendations.classList.add('hidden');
-});
-
-tabRecommendations.addEventListener('click', () => {
-    tabRecommendations.className = "px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white transition cursor-pointer";
-    tabCatalog.className = "px-4 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition cursor-pointer";
-    viewRecommendations.classList.remove('hidden');
-    viewCatalog.classList.add('hidden');
-    renderFavorites();
-    if (myFavorites.length > 0) {
-        generateSmartRecommendations();
-    }
-});
-
-// 1. Tendencias del Catálogo
-async function fetchTrendingMedia() {
-    if (!API_KEY) return;
-    try {
-        const res = await fetch(`${BASE_URL}/trending/all/day?api_key=${API_KEY}&language=es-ES`);
-        const data = await res.json();
-        displayMedia(data.results, moviesGrid);
-    } catch (e) { console.error(e); }
-}
-
-// Búsqueda en Catálogo
-let searchTimeout;
-searchInput.addEventListener('input', (e) => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(async () => {
-        const q = e.target.value.trim();
-        if (!q) {
-            sectionTitle.textContent = "Tendencias Populares";
-            fetchTrendingMedia();
-            return;
-        }
-        sectionTitle.textContent = `Resultados para: "${q}"`;
-        const res = await fetch(`${BASE_URL}/search/multi?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        displayMedia(data.results.filter(i => i.media_type === 'movie' || i.media_type === 'tv'), moviesGrid);
-    }, 400);
-});
-
-// Renderizar Cuadrícula
-function displayMedia(items, container) {
-    container.innerHTML = '';
-    if (!items || items.length === 0) {
-        container.innerHTML = '<p class="text-zinc-400 col-span-full text-center py-10">No se encontraron resultados.</p>';
-        return;
-    }
-
-    items.forEach(item => {
-        const { id, title, name, poster_path, vote_average, release_date, first_air_date, media_type } = item;
-        const mediaTitle = title || name;
-        const date = release_date || first_air_date;
-        const poster = poster_path ? `${IMG_URL}${poster_path}` : 'https://via.placeholder.com/500x750?text=Sin+Imagen';
-        const realType = media_type || (title ? 'movie' : 'tv');
-
-        const card = document.createElement('div');
-        card.className = 'bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 hover:border-red-600 transition cursor-pointer flex flex-col group';
-        card.innerHTML = `
-            <div class="relative overflow-hidden aspect-[2/3]">
-                <img src="${poster}" alt="${mediaTitle}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-[10px] font-bold px-2 py-0.5 rounded text-zinc-300 uppercase">${realType === 'tv' ? 'Serie' : 'Película'}</span>
-                <span class="absolute top-2 right-2 bg-black/70 backdrop-blur-md text-xs font-bold px-2 py-1 rounded text-amber-400">⭐ ${vote_average ? vote_average.toFixed(1) : 'N/A'}</span>
-            </div>
-            <div class="p-4 flex flex-col flex-grow justify-between">
-                <h3 class="font-bold text-sm text-zinc-100 truncate">${mediaTitle}</h3>
-                <p class="text-xs text-zinc-500 mt-1">${date ? date.split('-')[0] : ''}</p>
-            </div>
-        `;
-        card.addEventListener('click', () => fetchMediaDetails(id, realType));
-        container.appendChild(card);
-    });
-}
-
-// 2. SISTEMA DE FAVORITOS Y RECOMENDACIONES
+// BUSCADOR PARA AGREGAR A LA LISTA LATERAL
 let favSearchTimeout;
 favSearchInput.addEventListener('input', (e) => {
     clearTimeout(favSearchTimeout);
     const q = e.target.value.trim();
-    if (!q) {
+    if (!q || !API_KEY) {
         favSuggestions.classList.add('hidden');
         return;
     }
@@ -160,9 +74,9 @@ favSearchInput.addEventListener('input', (e) => {
                 const title = item.title || item.name;
                 const type = item.media_type === 'tv' ? 'tv' : 'movie';
                 const year = (item.release_date || item.first_air_date || '').split('-')[0];
-                return `<div class="p-3 hover:bg-zinc-900 cursor-pointer text-xs flex justify-between items-center border-b border-zinc-900" onclick="addFavorite(${item.id}, '${type}', '${title.replace(/'/g, "")}')">
-                    <span><strong>${title}</strong> (${year})</span>
-                    <span class="text-red-500 font-bold">+ Agregar</span>
+                return `<div class="p-2.5 hover:bg-zinc-900 cursor-pointer text-xs flex justify-between items-center border-b border-zinc-900" onclick="addFavorite(${item.id}, '${type}', '${title.replace(/'/g, "")}')">
+                    <span class="truncate pr-2"><strong>${title}</strong> (${year || 'N/A'})</span>
+                    <span class="text-red-500 font-bold whitespace-nowrap">+ Agregar</span>
                 </div>`;
             }).join('');
         }
@@ -170,7 +84,6 @@ favSearchInput.addEventListener('input', (e) => {
     }, 300);
 });
 
-// Cerrar sugerencias al hacer clic fuera
 document.addEventListener('click', (e) => {
     if (!favSearchInput.contains(e.target) && !favSuggestions.contains(e.target)) {
         favSuggestions.classList.add('hidden');
@@ -194,26 +107,31 @@ window.removeFavorite = function(id, type) {
     if (myFavorites.length > 0) {
         generateSmartRecommendations();
     } else {
-        recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-10">Agrega al menos una película o serie favorita arriba para generar recomendaciones personalizadas.</p>';
+        recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-16 bg-zinc-900/30 rounded-2xl border border-zinc-900">Agrega al menos una película o serie favorita en la barra lateral izquierda para comenzar.</p>';
     }
 };
 
+// RENDERIZAR LISTA LATERAL PROFESIONAL
 function renderFavorites() {
     if (myFavorites.length === 0) {
-        myFavoritesList.innerHTML = '<p class="text-xs text-zinc-500 italic">No tienes favoritas registradas aún.</p>';
+        myFavoritesList.innerHTML = '<p class="text-xs text-zinc-500 italic text-center py-4">No hay elementos registrados.</p>';
         return;
     }
     myFavoritesList.innerHTML = myFavorites.map(fav => `
-        <span class="bg-zinc-800 border border-zinc-700 text-xs px-3 py-1.5 rounded-xl flex items-center gap-2">
-            ${fav.title} (${fav.type === 'tv' ? 'Serie' : 'Película'})
-            <button onclick="removeFavorite(${fav.id}, '${fav.type}')" class="text-zinc-400 hover:text-red-500 font-bold cursor-pointer">&times;</button>
-        </span>
+        <div class="bg-zinc-950 border border-zinc-800 px-3 py-2 rounded-xl flex justify-between items-center text-xs group hover:border-zinc-700 transition">
+            <span class="truncate pr-2 font-medium text-zinc-200" title="${fav.title}">${fav.title}</span>
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] text-zinc-500 uppercase">${fav.type === 'tv' ? 'Serie' : 'Película'}</span>
+                <button onclick="removeFavorite(${fav.id}, '${fav.type}')" class="text-zinc-500 hover:text-red-500 font-bold text-sm px-1 cursor-pointer transition" title="Eliminar">&times;</button>
+            </div>
+        </div>
     `).join('');
 }
 
+// GENERAR RECOMENDACIONES POR GÉNERO
 async function generateSmartRecommendations() {
-    if (myFavorites.length === 0) return;
-    recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-10">Analizando tus gustos y buscando recomendaciones por género...</p>';
+    if (myFavorites.length === 0 || !API_KEY) return;
+    recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-16 bg-zinc-900/30 rounded-2xl border border-zinc-900">Analizando tus gustos y buscando recomendaciones por género...</p>';
 
     try {
         let recommendedItemsMap = new Map();
@@ -233,7 +151,7 @@ async function generateSmartRecommendations() {
         let allRecs = Array.from(recommendedItemsMap.values());
 
         if (allRecs.length === 0) {
-            recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-10">No hay suficientes recomendaciones aún. ¡Agrega más favoritas!</p>';
+            recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-16 bg-zinc-900/30 rounded-2xl border border-zinc-900">No hay suficientes recomendaciones aún. ¡Agrega más favoritas!</p>';
             return;
         }
 
@@ -261,21 +179,49 @@ async function generateSmartRecommendations() {
             sectionDiv.className = 'space-y-4';
             sectionDiv.innerHTML = `
                 <h3 class="text-lg font-bold text-zinc-200 border-l-4 border-red-600 pl-3">${genre}</h3>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6" id="genre-grid-${genre.replace(/\s+/g, '')}"></div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4" id="genre-grid-${genre.replace(/\s+/g, '')}"></div>
             `;
             recommendationsContainer.appendChild(sectionDiv);
 
             const gridTarget = document.getElementById(`genre-grid-${genre.replace(/\s+/g, '')}`);
-            displayMedia(items.slice(0, 5), gridTarget);
+            displayMediaCards(items.slice(0, 4), gridTarget);
         }
 
     } catch (error) {
         console.error("Error generando recomendaciones:", error);
-        recommendationsContainer.innerHTML = '<p class="text-center text-red-400 py-10">Ocurrió un error al calcular tus recomendaciones.</p>';
+        recommendationsContainer.innerHTML = '<p class="text-center text-red-400 py-16 bg-zinc-900/30 rounded-2xl border border-zinc-900">Ocurrió un error al calcular tus recomendaciones.</p>';
     }
 }
 
-// 3. DETALLES Y MAPA DE CALOR
+// RENDERIZAR TARJETAS EN RECOMENDACIONES
+function displayMediaCards(items, container) {
+    container.innerHTML = '';
+    items.forEach(item => {
+        const { id, title, name, poster_path, vote_average, release_date, first_air_date, media_type } = item;
+        const mediaTitle = title || name;
+        const date = release_date || first_air_date;
+        const poster = poster_path ? `${IMG_URL}${poster_path}` : 'https://via.placeholder.com/500x750?text=Sin+Imagen';
+        const realType = media_type || (title ? 'movie' : 'tv');
+
+        const card = document.createElement('div');
+        card.className = 'bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-red-600 transition cursor-pointer flex flex-col group';
+        card.innerHTML = `
+            <div class="relative overflow-hidden aspect-[2/3]">
+                <img src="${poster}" alt="${mediaTitle}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-[10px] font-bold px-2 py-0.5 rounded text-zinc-300 uppercase">${realType === 'tv' ? 'Serie' : 'Película'}</span>
+                <span class="absolute top-2 right-2 bg-black/70 backdrop-blur-md text-xs font-bold px-2 py-1 rounded text-amber-400">⭐ ${vote_average ? vote_average.toFixed(1) : 'N/A'}</span>
+            </div>
+            <div class="p-3 flex flex-col flex-grow justify-between">
+                <h4 class="font-bold text-xs text-zinc-100 truncate">${mediaTitle}</h4>
+                <p class="text-[11px] text-zinc-500 mt-0.5">${date ? date.split('-')[0] : ''}</p>
+            </div>
+        `;
+        card.addEventListener('click', () => fetchMediaDetails(id, realType));
+        container.appendChild(card);
+    });
+}
+
+// DETALLES Y MAPA DE CALOR
 async function fetchMediaDetails(id, type) {
     try {
         let endpoint = `${BASE_URL}/${type}/${id}`;
