@@ -10,7 +10,6 @@ window.toggleMenu = function(e) {
     }
 };
 
-// Cerrar menú al hacer clic fuera
 document.addEventListener('click', (e) => {
     const menu = document.getElementById('menuDropdown');
     const btn = document.getElementById('menuBtn');
@@ -30,6 +29,7 @@ const favSearchInput = document.getElementById('favSearchInput');
 const favSuggestions = document.getElementById('favSuggestions');
 const myFavoritesList = document.getElementById('myFavoritesList');
 const recommendationsContainer = document.getElementById('recommendationsContainer');
+const genresBar = document.getElementById('genresBar');
 
 const detailModal = document.getElementById('detailModal');
 const closeModal = document.getElementById('closeModal');
@@ -43,6 +43,12 @@ let API_KEY = localStorage.getItem('tmdb_api_key') || '';
 let rawFavorites = JSON.parse(localStorage.getItem('fernando_favorites')) || [];
 let myFavorites = rawFavorites.filter(item => item && typeof item === 'object' && item.id && item.type);
 
+// Filtros activos
+let currentTypeFilter = 'all'; // 'all', 'tv', 'movie'
+let currentGenreFilter = 'all';
+let allLoadedRecommendations = [];
+let genreMap = new Map();
+
 if (API_KEY) {
     apiKeyInput.value = API_KEY;
     renderFavorites();
@@ -53,7 +59,6 @@ if (API_KEY) {
     recommendationsContainer.innerHTML = '<p class="text-center text-amber-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">Haz clic en el botón hamburguesa <strong>(≡)</strong> para ingresar tu TMDB API Key.</p>';
 }
 
-// Guardar API Key
 saveApiKeyBtn.addEventListener('click', () => {
     const key = apiKeyInput.value.trim();
     if (key) {
@@ -108,7 +113,6 @@ favSearchInput.addEventListener('input', (e) => {
     }, 250);
 });
 
-// AGREGAR AL INICIO
 window.addFavorite = function(id, type, title) {
     if (myFavorites.some(f => f.id === id && f.type === type)) {
         favSearchInput.value = '';
@@ -130,6 +134,8 @@ window.removeFavorite = function(id, type) {
     if (myFavorites.length > 0) {
         generateSmartRecommendations();
     } else {
+        allLoadedRecommendations = [];
+        genresBar.innerHTML = '';
         recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4 text-xs sm:text-sm">Agrega al menos una película o serie favorita en el menú hamburguesa para comenzar.</p>';
     }
 };
@@ -150,20 +156,79 @@ function renderFavorites() {
     `).join('');
 }
 
-// ALGORITMO DIVERSIFICADO Y ANTI-SAGA
+// CONTROL DE FILTRO: TODO / SERIES / PELÍCULAS
+window.setTypeFilter = function(type) {
+    currentTypeFilter = type;
+    currentGenreFilter = 'all'; // reiniciar género al cambiar categoría principal
+
+    const btnAll = document.getElementById('filterAll');
+    const btnTv = document.getElementById('filterTv');
+    const btnMovie = document.getElementById('filterMovie');
+
+    const activeClasses = "bg-red-600 text-white border-red-500 shadow-lg";
+    const inactiveClasses = "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700";
+
+    btnAll.className = `py-3 rounded-2xl font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-1 border transition active:scale-95 cursor-pointer ${type === 'all' ? activeClasses : inactiveClasses}`;
+    btnTv.className = `py-3 rounded-2xl font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-1 border transition active:scale-95 cursor-pointer ${type === 'tv' ? activeClasses : inactiveClasses}`;
+    btnMovie.className = `py-3 rounded-2xl font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-1 border transition active:scale-95 cursor-pointer ${type === 'movie' ? activeClasses : inactiveClasses}`;
+
+    updateGenresBar();
+    renderFilteredFeed();
+};
+
+// CONTROL DE FILTRO DE GÉNERO
+window.setGenreFilter = function(genreName) {
+    currentGenreFilter = genreName;
+    updateGenresBar();
+    renderFilteredFeed();
+};
+
+// ACTUALIZAR BARRA HORIZONTAL DE GÉNEROS
+function updateGenresBar() {
+    // Filtrar según el tipo actual (todo, tv, movie)
+    let availableItems = allLoadedRecommendations.filter(item => {
+        if (currentTypeFilter === 'all') return true;
+        return item.media_type === currentTypeFilter;
+    });
+
+    let genresSet = new Set();
+    availableItems.forEach(item => {
+        (item.genre_ids || []).forEach(gId => {
+            const name = genreMap.get(gId);
+            if (name) genresSet.add(name);
+        });
+    });
+
+    const genresList = Array.from(genresSet).sort();
+
+    let html = `
+        <button onclick="setGenreFilter('all')" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer border ${currentGenreFilter === 'all' ? 'bg-white text-zinc-950 border-white' : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'}">
+            Todos los géneros
+        </button>
+    `;
+
+    genresList.forEach(genre => {
+        const isSelected = currentGenreFilter === genre;
+        html += `
+            <button onclick="setGenreFilter('${genre}')" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer border ${isSelected ? 'bg-white text-zinc-950 border-white' : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'}">
+                ${genre}
+            </button>
+        `;
+    });
+
+    genresBar.innerHTML = html;
+}
+
+// OBTENER RECOMENDACIONES DE LA API
 async function generateSmartRecommendations() {
     if (myFavorites.length === 0 || !API_KEY) return;
     recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Analizando tus gustos con balance equitativo...</p>';
 
     try {
-        // Palabras clave de las favoritas para bloquear secuelas directas de la misma saga
         const favoriteKeywords = myFavorites.map(f => {
             return f.title.toLowerCase().replace(/[:\-0-9]/g, '').trim().split(' ')[0];
         }).filter(w => w.length > 3);
 
-        let candidatesPool = [];
-
-        // Consultamos en paralelo recomendaciones y similares para cada una de tus favoritas
         const fetchPromises = myFavorites.map(async (fav) => {
             try {
                 const [recsRes, simRes] = await Promise.all([
@@ -175,7 +240,6 @@ async function generateSmartRecommendations() {
 
                 const combined = [...(recsData.results || []), ...(simData.results || [])];
 
-                // Filtramos que no sea la misma favorita y que no sea una secuela evidente
                 const filtered = combined.filter(item => {
                     const itemTitle = (item.title || item.name || '').toLowerCase();
                     const isAlreadyFav = myFavorites.some(f => f.id === item.id);
@@ -183,7 +247,6 @@ async function generateSmartRecommendations() {
                     return !isAlreadyFav && !isSameFranchise;
                 });
 
-                // Tomamos hasta 6 títulos variados por cada favorita para que ninguna predomine
                 return filtered.slice(0, 6).map(item => ({ ...item, media_type: fav.type }));
             } catch (err) {
                 return [];
@@ -192,8 +255,8 @@ async function generateSmartRecommendations() {
 
         const resultsByFavorite = await Promise.all(fetchPromises);
 
-        // Mezcla entrelazada (Round-Robin) para dar exactamente el mismo peso a todas tus favoritas
         let maxLen = Math.max(...resultsByFavorite.map(arr => arr.length));
+        let candidatesPool = [];
         let seenIds = new Set();
 
         for (let i = 0; i < maxLen; i++) {
@@ -205,47 +268,81 @@ async function generateSmartRecommendations() {
             }
         }
 
-        if (candidatesPool.length === 0) {
-            recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">No se hallaron recomendaciones distintas. ¡Prueba agregando otras series o películas!</p>';
-            return;
-        }
+        allLoadedRecommendations = candidatesPool;
 
-        // Catálogo de géneros
-        const genreRes = await fetch(`${BASE_URL}/genre/movie/list?api_key=${API_KEY}&language=es-ES`);
-        const genreData = await genreRes.json();
-        const genreMap = new Map(genreData.genres.map(g => [g.id, g.name]));
+        // Cargar mapa de nombres de géneros (películas y series)
+        const [genreMovieRes, genreTvRes] = await Promise.all([
+            fetch(`${BASE_URL}/genre/movie/list?api_key=${API_KEY}&language=es-ES`),
+            fetch(`${BASE_URL}/genre/tv/list?api_key=${API_KEY}&language=es-ES`)
+        ]);
+        const genreMovieData = await genreMovieRes.json();
+        const genreTvData = await genreTvRes.json();
+        
+        genreMap = new Map();
+        (genreMovieData.genres || []).forEach(g => genreMap.set(g.id, g.name));
+        (genreTvData.genres || []).forEach(g => genreMap.set(g.id, g.name));
 
-        let groupedByGenre = {};
-        candidatesPool.forEach(item => {
-            const genreIds = item.genre_ids || [];
-            genreIds.forEach(gId => {
-                const genreName = genreMap.get(gId) || 'Otros';
-                if (!groupedByGenre[genreName]) groupedByGenre[genreName] = [];
-                if (!groupedByGenre[genreName].some(existing => existing.id === item.id)) {
-                    groupedByGenre[genreName].push(item);
-                }
-            });
-        });
-
-        recommendationsContainer.innerHTML = '';
-        for (let [genre, items] of Object.entries(groupedByGenre)) {
-            if (items.length === 0) continue;
-
-            const sectionDiv = document.createElement('div');
-            sectionDiv.className = 'space-y-4';
-            sectionDiv.innerHTML = `
-                <h3 class="text-base sm:text-lg font-bold text-zinc-200 border-l-4 border-red-600 pl-3">${genre}</h3>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" id="genre-grid-${genre.replace(/\s+/g, '')}"></div>
-            `;
-            recommendationsContainer.appendChild(sectionDiv);
-
-            const gridTarget = document.getElementById(`genre-grid-${genre.replace(/\s+/g, '')}`);
-            displayMediaCards(items.slice(0, 5), gridTarget);
-        }
+        updateGenresBar();
+        renderFilteredFeed();
 
     } catch (error) {
         console.error("Error generando recomendaciones:", error);
         recommendationsContainer.innerHTML = '<p class="text-center text-red-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Ocurrió un error al calcular tus recomendaciones.</p>';
+    }
+}
+
+// RENDERIZAR FEED CON LOS FILTROS APLICADOS
+function renderFilteredFeed() {
+    let filtered = allLoadedRecommendations;
+
+    // Filtro por Tipo (Todo / Series / Películas)
+    if (currentTypeFilter !== 'all') {
+        filtered = filtered.filter(item => item.media_type === currentTypeFilter);
+    }
+
+    // Filtro por Género
+    if (currentGenreFilter !== 'all') {
+        filtered = filtered.filter(item => {
+            const itemGenres = (item.genre_ids || []).map(id => genreMap.get(id));
+            return itemGenres.includes(currentGenreFilter);
+        });
+    }
+
+    if (filtered.length === 0) {
+        recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">No hay títulos disponibles para esta combinación de filtros.</p>';
+        return;
+    }
+
+    // Agrupar por género
+    let groupedByGenre = {};
+    filtered.forEach(item => {
+        const genreIds = item.genre_ids || [];
+        genreIds.forEach(gId => {
+            const genreName = genreMap.get(gId) || 'Otros';
+            // Si hay un género específico seleccionado, solo poblar ese grupo
+            if (currentGenreFilter !== 'all' && genreName !== currentGenreFilter) return;
+
+            if (!groupedByGenre[genreName]) groupedByGenre[genreName] = [];
+            if (!groupedByGenre[genreName].some(existing => existing.id === item.id)) {
+                groupedByGenre[genreName].push(item);
+            }
+        });
+    });
+
+    recommendationsContainer.innerHTML = '';
+    for (let [genre, items] of Object.entries(groupedByGenre)) {
+        if (items.length === 0) continue;
+
+        const sectionDiv = document.createElement('div');
+        sectionDiv.className = 'space-y-4';
+        sectionDiv.innerHTML = `
+            <h3 class="text-base sm:text-lg font-bold text-zinc-200 border-l-4 border-red-600 pl-3">${genre}</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" id="genre-grid-${genre.replace(/\s+/g, '')}"></div>
+        `;
+        recommendationsContainer.appendChild(sectionDiv);
+
+        const gridTarget = document.getElementById(`genre-grid-${genre.replace(/\s+/g, '')}`);
+        displayMediaCards(items.slice(0, 5), gridTarget);
     }
 }
 
@@ -283,7 +380,7 @@ function displayMediaCards(items, container) {
     });
 }
 
-// OBTENER DETALLES Y PROVEEDORES DE STREAMING
+// DETALLES Y PROVEEDORES
 async function fetchMediaDetails(id, type) {
     try {
         let endpoint = `${BASE_URL}/${type}/${id}`;
@@ -325,7 +422,6 @@ function getProvidersHtml(providers) {
     `;
 }
 
-// MODAL PARA PELÍCULAS
 function showMovieModal(movie, providers) {
     const backdrop = movie.backdrop_path ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}` : '';
     const rating = movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A';
@@ -380,7 +476,6 @@ function showMovieModal(movie, providers) {
     detailModal.classList.remove('hidden');
 }
 
-// MODAL PARA SERIES
 async function showTvModal(tv, providers) {
     const backdrop = tv.backdrop_path ? `https://image.tmdb.org/t/p/original${tv.backdrop_path}` : '';
     const rating = tv.vote_average ? tv.vote_average.toFixed(1) : 'N/A';
