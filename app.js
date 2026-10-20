@@ -1,4 +1,4 @@
-// --- FUNCIÓN GLOBAL DE APERTURA DEL MENÚ (A prueba de fallos) ---
+// --- FUNCIÓN GLOBAL DE APERTURA DEL MENÚ ---
 window.toggleMenu = function(e) {
     if (e) {
         e.stopPropagation();
@@ -10,7 +10,7 @@ window.toggleMenu = function(e) {
     }
 };
 
-// Cerrar menú al hacer clic en el fondo de la página
+// Cerrar menú al hacer clic fuera
 document.addEventListener('click', (e) => {
     const menu = document.getElementById('menuDropdown');
     const btn = document.getElementById('menuBtn');
@@ -41,8 +41,6 @@ const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
 // Estado
 let API_KEY = localStorage.getItem('tmdb_api_key') || '';
 let rawFavorites = JSON.parse(localStorage.getItem('fernando_favorites')) || [];
-
-// Sanitización para limpiar datos guardados en versiones anteriores
 let myFavorites = rawFavorites.filter(item => item && typeof item === 'object' && item.id && item.type);
 
 if (API_KEY) {
@@ -52,7 +50,7 @@ if (API_KEY) {
         generateSmartRecommendations();
     }
 } else {
-    recommendationsContainer.innerHTML = '<p class="text-center text-amber-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">Haz clic en el botón hamburguesa <strong>(≡)</strong> arriba a la derecha para ingresar tu TMDB API Key.</p>';
+    recommendationsContainer.innerHTML = '<p class="text-center text-amber-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">Haz clic en el botón hamburguesa <strong>(≡)</strong> para ingresar tu TMDB API Key.</p>';
 }
 
 // Guardar API Key
@@ -110,13 +108,15 @@ favSearchInput.addEventListener('input', (e) => {
     }, 250);
 });
 
+// AGREGAR AL INICIO CON .unshift()
 window.addFavorite = function(id, type, title) {
     if (myFavorites.some(f => f.id === id && f.type === type)) {
         favSearchInput.value = '';
         favSuggestions.classList.add('hidden');
         return;
     }
-    myFavorites.push({ id, type, title });
+    // unshift coloca el nuevo elemento de primero
+    myFavorites.unshift({ id, type, title });
     localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
     favSearchInput.value = '';
     favSuggestions.classList.add('hidden');
@@ -144,16 +144,17 @@ function renderFavorites() {
         <div class="bg-zinc-950 border border-zinc-800 px-3 py-1.5 rounded-xl flex justify-between items-center text-xs group hover:border-zinc-700 transition">
             <span class="truncate pr-2 font-medium text-zinc-200" title="${fav.title}">${fav.title}</span>
             <div class="flex items-center gap-2">
-                <span class="text-[9px] text-zinc-500 uppercase">${fav.type === 'tv' ? 'Serie' : 'Película'}</span>
+                <span class="text-[9px] ${fav.type === 'tv' ? 'text-emerald-400 font-semibold' : 'text-amber-500 font-semibold'} uppercase">${fav.type === 'tv' ? 'Serie' : 'Película'}</span>
                 <button type="button" onclick="removeFavorite(${fav.id}, '${fav.type}')" class="text-zinc-400 hover:text-red-500 font-bold text-base px-1.5 cursor-pointer transition" title="Eliminar">&times;</button>
             </div>
         </div>
     `).join('');
 }
 
+// GENERAR RECOMENDACIONES POR GÉNERO
 async function generateSmartRecommendations() {
     if (myFavorites.length === 0 || !API_KEY) return;
-    recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Analizando tus gustos y buscando recomendaciones por género...</p>';
+    recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Buscando recomendaciones basadas en tus favoritas...</p>';
 
     try {
         let recommendedItemsMap = new Map();
@@ -173,7 +174,7 @@ async function generateSmartRecommendations() {
         let allRecs = Array.from(recommendedItemsMap.values());
 
         if (allRecs.length === 0) {
-            recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">No hay suficientes recomendaciones para los elementos actuales. ¡Prueba agregando otras series o películas!</p>';
+            recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">No hay suficientes recomendaciones disponibles aún.</p>';
             return;
         }
 
@@ -210,11 +211,12 @@ async function generateSmartRecommendations() {
         }
 
     } catch (error) {
-        console.error("Error generando recomendaciones:", error);
+        console.error("Error:", error);
         recommendationsContainer.innerHTML = '<p class="text-center text-red-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Ocurrió un error al calcular tus recomendaciones.</p>';
     }
 }
 
+// RENDERIZAR TARJETAS CON ETIQUETAS VERDE/NARANJA AL LADO DEL TÍTULO
 function displayMediaCards(items, container) {
     container.innerHTML = '';
     items.forEach(item => {
@@ -224,17 +226,24 @@ function displayMediaCards(items, container) {
         const poster = poster_path ? `${IMG_URL}${poster_path}` : 'https://via.placeholder.com/500x750?text=Sin+Imagen';
         const realType = media_type || (title ? 'movie' : 'tv');
 
+        // Color verde para Serie y naranja para Película
+        const typeBadge = realType === 'tv' 
+            ? '<span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-1.5 py-0.5 rounded">Serie</span>' 
+            : '<span class="text-[10px] font-bold text-amber-500 bg-amber-950/60 border border-amber-800/60 px-1.5 py-0.5 rounded">Película</span>';
+
         const card = document.createElement('div');
         card.className = 'bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-red-600 transition cursor-pointer flex flex-col group';
         card.innerHTML = `
             <div class="relative overflow-hidden aspect-[2/3]">
                 <img src="${poster}" alt="${mediaTitle}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-[9px] font-bold px-1.5 py-0.5 rounded text-zinc-300 uppercase">${realType === 'tv' ? 'Serie' : 'Película'}</span>
                 <span class="absolute top-2 right-2 bg-black/70 backdrop-blur-md text-xs font-bold px-2 py-1 rounded text-amber-400">⭐ ${vote_average ? vote_average.toFixed(1) : 'N/A'}</span>
             </div>
-            <div class="p-3 flex flex-col flex-grow justify-between">
-                <h4 class="font-bold text-xs text-zinc-100 truncate">${mediaTitle}</h4>
-                <p class="text-[11px] text-zinc-500 mt-0.5">${date ? date.split('-')[0] : ''}</p>
+            <div class="p-3 flex flex-col flex-grow justify-between gap-1.5">
+                <div class="flex items-center gap-1.5 overflow-hidden">
+                    ${typeBadge}
+                    <h4 class="font-bold text-xs text-zinc-100 truncate">${mediaTitle}</h4>
+                </div>
+                <p class="text-[11px] text-zinc-500">${date ? date.split('-')[0] : ''}</p>
             </div>
         `;
         card.addEventListener('click', () => fetchMediaDetails(id, realType));
@@ -242,72 +251,187 @@ function displayMediaCards(items, container) {
     });
 }
 
+// OBTENER DETALLES Y PROVEEDORES DE STREAMING
 async function fetchMediaDetails(id, type) {
     try {
         let endpoint = `${BASE_URL}/${type}/${id}`;
-        let res = await fetch(`${endpoint}?api_key=${API_KEY}&language=es-ES`);
-        let data = await res.json();
+        let [resData, resProviders] = await Promise.all([
+            fetch(`${endpoint}?api_key=${API_KEY}&language=es-ES`),
+            fetch(`${endpoint}/watch/providers?api_key=${API_KEY}`)
+        ]);
+
+        let data = await resData.json();
+        let providersData = await resProviders.json();
+
+        // Buscar proveedores disponibles en tu región o globales
+        const results = providersData.results || {};
+        const localProviders = results.PE || results.MX || results.ES || results.US || {};
+        const flatrate = localProviders.flatrate || localProviders.buy || [];
 
         if (type === 'movie' && !data.runtime && data.number_of_seasons) type = 'tv';
 
-        const resVideos = await fetch(`${BASE_URL}/${type}/${id}/videos?api_key=${API_KEY}`);
-        const videoData = await resVideos.json();
-        const trailer = videoData.results.find(vid => vid.type === 'Trailer' && vid.site === 'YouTube');
-
-        if (type === 'tv') showTvModal(data, trailer ? trailer.key : null);
-        else showMovieModal(data, trailer ? trailer.key : null);
+        if (type === 'tv') {
+            showTvModal(data, flatrate);
+        } else {
+            showMovieModal(data, flatrate);
+        }
     } catch (e) { console.error(e); }
 }
 
-function showMovieModal(movie, trailerKey) {
+// HTML DE PLATAFORMAS DÓNDE VERLO
+function getProvidersHtml(providers) {
+    if (!providers || providers.length === 0) {
+        return '<p class="text-xs text-zinc-500 italic">No hay plataformas de streaming registradas para tu región.</p>';
+    }
+    return `
+        <div class="flex flex-wrap items-center gap-3">
+            ${providers.map(p => `
+                <div class="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 rounded-xl">
+                    <img src="https://image.tmdb.org/t/p/w92${p.logo_path}" alt="${p.provider_name}" class="w-5 h-5 rounded-md object-cover">
+                    <span class="text-xs font-medium text-zinc-200">${p.provider_name}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// MODAL PARA PELÍCULAS CON BOTONES DE TRAILER Y CRÍTICA EN YOUTUBE
+function showMovieModal(movie, providers) {
     const backdrop = movie.backdrop_path ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}` : '';
+    const rating = movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A';
+    const voteCount = movie.vote_count ? movie.vote_count.toLocaleString() : '0';
+
+    // Enlaces de búsqueda en YouTube
+    const trailerSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' trailer espanol latino')}`;
+    const reviewSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' critica reseña')}`;
+
     modalBody.innerHTML = `
         <div class="relative h-56 sm:h-72 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-4 bg-cover bg-center flex items-end p-4 sm:p-6" style="background-image: url('${backdrop}');">
             <div class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/40 to-transparent"></div>
-            <h2 class="relative z-10 text-xl sm:text-2xl font-black text-white drop-shadow-md">${movie.title}</h2>
-        </div>
-        <div class="space-y-4 text-sm text-zinc-300">
-            <div class="flex flex-wrap gap-2">${movie.genres.map(g => `<span class="bg-zinc-800 text-red-500 font-semibold px-3 py-1 rounded-full text-xs">${g.name}</span>`).join('')}</div>
-            <p class="leading-relaxed text-zinc-400 text-xs sm:text-sm">${movie.overview || 'Sin descripción.'}</p>
-            <div class="text-xs text-zinc-500 flex gap-4 pt-2 border-t border-zinc-800">
-                <span>Duración: <strong>${movie.runtime} min</strong></span>
-                <span>Estreno: <strong>${movie.release_date}</strong></span>
+            <div class="relative z-10 space-y-1">
+                <span class="text-[10px] font-bold text-amber-500 bg-amber-950/80 border border-amber-800/80 px-2 py-0.5 rounded uppercase">Película</span>
+                <h2 class="text-xl sm:text-2xl font-black text-white drop-shadow-md">${movie.title}</h2>
             </div>
-            ${trailerKey ? `<div class="mt-4"><h4 class="font-bold text-zinc-200 mb-2">Trailer Oficial</h4><div class="aspect-video w-full rounded-xl overflow-hidden bg-black"><iframe src="https://www.youtube.com/embed/${trailerKey}" class="w-full h-full" frameborder="0" allowfullscreen></iframe></div></div>` : ''}
+        </div>
+
+        <div class="space-y-5 text-sm text-zinc-300">
+            <!-- Calificación del Público -->
+            <div class="flex items-center gap-3 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
+                <span class="text-xl">⭐</span>
+                <div>
+                    <div class="text-sm font-bold text-white">${rating} / 10 <span class="text-xs font-normal text-zinc-400">calificación del público</span></div>
+                    <div class="text-[11px] text-zinc-500">${voteCount} votos registrados</div>
+                </div>
+            </div>
+
+            <!-- Dónde Ver -->
+            <div class="space-y-2">
+                <h4 class="text-xs font-bold text-zinc-200 uppercase tracking-wider">Dónde ver</h4>
+                ${getProvidersHtml(providers)}
+            </div>
+
+            <!-- Sinopsis -->
+            <div class="space-y-1.5">
+                <h4 class="text-xs font-bold text-zinc-200 uppercase tracking-wider">Sinopsis</h4>
+                <p class="leading-relaxed text-zinc-400 text-xs sm:text-sm">${movie.overview || 'Sin descripción disponible.'}</p>
+            </div>
+
+            <div class="text-xs text-zinc-500 flex gap-4 pt-1">
+                <span>Duración: <strong>${movie.runtime || 'N/A'} min</strong></span>
+                <span>Estreno: <strong>${movie.release_date || 'N/A'}</strong></span>
+            </div>
+
+            <!-- Botones Elegantes de YouTube -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <a href="${trailerSearchUrl}" target="_blank" rel="noopener noreferrer" class="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg">
+                    <span>▶ Ver Trailer en YouTube (Latino)</span>
+                </a>
+                <a href="${reviewSearchUrl}" target="_blank" rel="noopener noreferrer" class="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-zinc-200 font-bold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 border border-zinc-700 transition">
+                    <span>💬 Ver Crítica más vista en YouTube</span>
+                </a>
+            </div>
         </div>
     `;
     detailModal.classList.remove('hidden');
 }
 
-async function showTvModal(tv, trailerKey) {
+// MODAL PARA SERIES CON MAPA DE CALOR, BOTÓN TRAILER POR TEMPORADA Y CRÍTICA
+async function showTvModal(tv, providers) {
     const backdrop = tv.backdrop_path ? `https://image.tmdb.org/t/p/original${tv.backdrop_path}` : '';
+    const rating = tv.vote_average ? tv.vote_average.toFixed(1) : 'N/A';
+    const voteCount = tv.vote_count ? tv.vote_count.toLocaleString() : '0';
+
     let seasonsHtml = tv.seasons.filter(s => s.season_number > 0).map(s => `<option value="${s.season_number}">Temporada ${s.season_number} (${s.episode_count} eps)</option>`).join('');
+
+    const reviewSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(tv.name + ' critica serie resena')}`;
 
     modalBody.innerHTML = `
         <div class="relative h-56 sm:h-72 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-4 bg-cover bg-center flex items-end p-4 sm:p-6" style="background-image: url('${backdrop}');">
             <div class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/40 to-transparent"></div>
-            <h2 class="relative z-10 text-xl sm:text-2xl font-black text-white drop-shadow-md">${tv.name}</h2>
+            <div class="relative z-10 space-y-1">
+                <span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded uppercase">Serie</span>
+                <h2 class="text-xl sm:text-2xl font-black text-white drop-shadow-md">${tv.name}</h2>
+            </div>
         </div>
-        <div class="space-y-6 text-sm text-zinc-300">
-            <div class="flex flex-wrap gap-2">${tv.genres.map(g => `<span class="bg-zinc-800 text-red-500 font-semibold px-3 py-1 rounded-full text-xs">${g.name}</span>`).join('')}</div>
-            <p class="leading-relaxed text-zinc-400 text-xs sm:text-sm">${tv.overview || 'Sin descripción.'}</p>
-            
+
+        <div class="space-y-5 text-sm text-zinc-300">
+            <!-- Calificación del Público -->
+            <div class="flex items-center gap-3 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
+                <span class="text-xl">⭐</span>
+                <div>
+                    <div class="text-sm font-bold text-white">${rating} / 10 <span class="text-xs font-normal text-zinc-400">calificación del público</span></div>
+                    <div class="text-[11px] text-zinc-500">${voteCount} votos registrados</div>
+                </div>
+            </div>
+
+            <!-- Dónde Ver -->
+            <div class="space-y-2">
+                <h4 class="text-xs font-bold text-zinc-200 uppercase tracking-wider">Dónde ver</h4>
+                ${getProvidersHtml(providers)}
+            </div>
+
+            <!-- Sinopsis -->
+            <div class="space-y-1.5">
+                <h4 class="text-xs font-bold text-zinc-200 uppercase tracking-wider">Sinopsis</h4>
+                <p class="leading-relaxed text-zinc-400 text-xs sm:text-sm">${tv.overview || 'Sin descripción disponible.'}</p>
+            </div>
+
+            <!-- Botones a YouTube -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <a id="seasonTrailerBtn" href="https://www.youtube.com/results?search_query=${encodeURIComponent(tv.name + ' temporada 1 trailer espanol latino')}" target="_blank" rel="noopener noreferrer" class="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg">
+                    <span>▶ Ver Trailer Temporada 1 (Latino)</span>
+                </a>
+                <a href="${reviewSearchUrl}" target="_blank" rel="noopener noreferrer" class="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-zinc-200 font-bold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 border border-zinc-700 transition">
+                    <span>💬 Ver Crítica en YouTube</span>
+                </a>
+            </div>
+
+            <!-- Mapa de Calor de Episodios -->
             <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <h3 class="font-bold text-sm sm:text-base text-zinc-100">Calificaciones por Episodio</h3>
                     <select id="seasonSelect" class="bg-zinc-800 border border-zinc-700 text-xs px-3 py-2 rounded-lg font-medium">${seasonsHtml}</select>
                 </div>
-                <div id="episodesHeatmap" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 pt-2">
+                <div id="episodesHeatmap" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 pt-2">
                     <p class="text-xs text-zinc-500 col-span-full text-center py-4">Cargando episodios...</p>
                 </div>
             </div>
-
-            ${trailerKey ? `<div class="mt-4"><h4 class="font-bold text-zinc-200 mb-2">Trailer Oficial</h4><div class="aspect-video w-full rounded-lg overflow-hidden bg-black"><iframe src="https://www.youtube.com/embed/${trailerKey}" class="w-full h-full" frameborder="0" allowfullscreen></iframe></div></div>` : ''}
         </div>
     `;
     detailModal.classList.remove('hidden');
     loadSeasonEpisodes(tv.id, 1);
-    document.getElementById('seasonSelect').addEventListener('change', (e) => loadSeasonEpisodes(tv.id, e.target.value));
+
+    // Cambiar temporada: actualiza los episodios y el enlace del botón de trailer
+    document.getElementById('seasonSelect').addEventListener('change', (e) => {
+        const seasonNum = e.target.value;
+        loadSeasonEpisodes(tv.id, seasonNum);
+        
+        const trailerBtn = document.getElementById('seasonTrailerBtn');
+        if (trailerBtn) {
+            trailerBtn.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(tv.name + ' temporada ' + seasonNum + ' trailer espanol latino')}`;
+            trailerBtn.querySelector('span').textContent = `▶ Ver Trailer Temporada ${seasonNum} (Latino)`;
+        }
+    });
 }
 
 async function loadSeasonEpisodes(tvId, seasonNumber) {
