@@ -2,16 +2,12 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- Bloqueo de zoom de pellizco y doble toque para app nativa en móvil -->
+    <!-- Bloqueo de zoom para experiencia nativa -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>El baúl de fernando</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Prevenir comportamientos de zoom y rebote indeseados en táctil */
-        body {
-            touch-action: manipulation;
-            -webkit-text-size-adjust: 100%;
-        }
+        body { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     </style>
 </head>
 <body class="bg-zinc-950 text-white font-sans antialiased min-h-screen flex flex-col justify-between">
@@ -22,59 +18,60 @@
             <h1 class="text-lg sm:text-2xl font-black tracking-wider text-red-600">EL BAÚL DE <span class="text-white">FERNANDO</span></h1>
         </div>
 
-        <!-- Configuración API Key (Icono SVG minimalista) -->
+        <!-- Botón Hamburguesa -->
         <div class="relative">
-            <button id="configBtn" class="bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition cursor-pointer" title="Configurar API Key">
-                <!-- Icono SVG de engranaje minimalista -->
-                <svg class="w-4 h-4 sm:w-5 sm:h-5 text-zinc-300 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <button id="menuBtn" class="bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 w-10 h-10 rounded-xl flex items-center justify-center transition cursor-pointer" title="Menú">
+                <!-- Icono Hamburguesa SVG -->
+                <svg class="w-5 h-5 text-zinc-300 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
                 </svg>
             </button>
-            <div id="configMenu" class="hidden absolute right-0 mt-2 w-72 bg-zinc-900 border border-zinc-800 rounded-xl p-4 shadow-2xl z-50 space-y-3">
-                <p class="text-xs text-zinc-400">Ingresa tu TMDB API Key para activar la app:</p>
-                <input type="password" id="apiKeyInput" placeholder="Pega tu API Key aquí..." class="w-full bg-zinc-800 border border-zinc-700 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-red-600">
-                <button id="saveApiKeyBtn" class="w-full bg-red-600 hover:bg-red-700 text-xs font-bold py-2 rounded-lg transition cursor-pointer">Guardar Cambios</button>
+
+            <!-- Menú Desplegable (Sidebar / Panel Oculto) -->
+            <div id="menuDropdown" class="hidden absolute right-0 mt-2 w-80 max-w-[90vw] bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl z-50 space-y-6">
+                
+                <!-- Sección 1: Tus Favoritas / Vistas -->
+                <div class="space-y-3">
+                    <h2 class="text-sm font-bold text-zinc-100 flex items-center gap-2">🎬 Mis Favoritas (Ya vistas)</h2>
+                    <p class="text-[11px] text-zinc-400">Agrega películas o series para tus recomendaciones.</p>
+                    
+                    <div class="relative">
+                        <input type="text" id="favSearchInput" autocomplete="off" placeholder="Buscar para agregar..." class="w-full bg-zinc-950 border border-zinc-700 px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-red-600 transition">
+                        <div id="favSuggestions" class="hidden absolute left-0 right-0 top-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl"></div>
+                    </div>
+
+                    <div id="myFavoritesList" class="space-y-2 max-h-44 overflow-y-auto pr-1">
+                        <p class="text-xs text-zinc-500 italic text-center py-2">No hay elementos registrados.</p>
+                    </div>
+                </div>
+
+                <hr class="border-zinc-800">
+
+                <!-- Sección 2: Configuración de API Key -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">⚙️ Configuración de API Key</h3>
+                    <input type="password" id="apiKeyInput" placeholder="Pega tu TMDB API Key..." class="w-full bg-zinc-950 border border-zinc-700 px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-red-600">
+                    <button id="saveApiKeyBtn" class="w-full bg-red-600 hover:bg-red-700 text-xs font-bold py-2 rounded-xl transition cursor-pointer">Guardar API Key</button>
+                </div>
+
             </div>
         </div>
     </header>
 
-    <!-- Contenido Principal -->
-    <main class="container mx-auto px-4 sm:px-6 py-6 flex-grow">
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-            
-            <!-- COLUMNA IZQUIERDA: Sidebar de Favoritas -->
-            <aside class="lg:col-span-1 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 lg:sticky lg:top-24">
+    <!-- Contenido Principal (Ahora ocupa todo el ancho con las recomendaciones) -->
+    <main class="container mx-auto px-4 sm:px-6 py-8 flex-grow">
+        <section class="space-y-6">
+            <div class="border-b border-zinc-800 pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div>
-                    <h2 class="text-sm sm:text-base font-bold text-zinc-100 flex items-center gap-2">🎬 Mis Favoritas</h2>
-                    <p class="text-[11px] text-zinc-400 mt-0.5">Busca y agrega lo que ya viste.</p>
+                    <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Recomendaciones Personalizadas por Género</h2>
+                    <p class="text-xs text-zinc-400 mt-0.5 pl-3">Basadas en tu lista de favoritas dentro del menú hamburguesa (右上角).</p>
                 </div>
+            </div>
 
-                <!-- Buscador con sugerencias -->
-                <div class="relative">
-                    <input type="text" id="favSearchInput" autocomplete="off" placeholder="Escribe para buscar..." class="w-full bg-zinc-950 border border-zinc-700 px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-red-600 transition">
-                    <div id="favSuggestions" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-zinc-950 border border-zinc-800 rounded-xl max-h-60 overflow-y-auto z-50 shadow-2xl"></div>
-                </div>
-
-                <!-- Lista de favoritos -->
-                <div id="myFavoritesList" class="space-y-2 max-h-[40vh] lg:max-h-[50vh] overflow-y-auto pr-1">
-                    <p class="text-xs text-zinc-500 italic text-center py-4">No hay elementos registrados.</p>
-                </div>
-            </aside>
-
-            <!-- COLUMNA DERECHA: Recomendaciones -->
-            <section class="lg:col-span-3 space-y-6">
-                <div class="border-b border-zinc-800 pb-3">
-                    <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Recomendaciones por Género</h2>
-                    <p class="text-xs text-zinc-400 mt-0.5 pl-3">Basadas en tu lista de favoritas.</p>
-                </div>
-
-                <div id="recommendationsContainer" class="space-y-8">
-                    <p class="text-center text-zinc-500 py-16 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4 text-xs sm:text-sm">Agrega al menos una película o serie en la barra lateral izquierda para comenzar.</p>
-                </div>
-            </section>
-
-        </div>
+            <div id="recommendationsContainer" class="space-y-10">
+                <p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4 text-xs sm:text-sm">Abre el menú hamburguesa <strong>(≡)</strong> arriba a la derecha, configura tu API Key y agrega tus películas o series favoritas para comenzar.</p>
+            </div>
+        </section>
     </main>
 
     <!-- Modal de Detalles y Mapa de Calor -->
