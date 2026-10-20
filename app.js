@@ -24,7 +24,7 @@ const configMenu = document.getElementById('configMenu');
 const apiKeyInput = document.getElementById('apiKeyInput');
 const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
 
-// Estado de la app (guardado en LocalStorage)
+// Estado
 let API_KEY = localStorage.getItem('tmdb_api_key') || '';
 let myFavorites = JSON.parse(localStorage.getItem('fernando_favorites')) || [];
 
@@ -36,7 +36,7 @@ if (API_KEY) {
     moviesGrid.innerHTML = '<p class="text-amber-400 col-span-full text-center py-10">Haz clic en el icono <strong>⚙️</strong> arriba a la derecha para ingresar tu API Key.</p>';
 }
 
-// Configuración de API Key
+// Configuración API Key
 configBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     configMenu.classList.toggle('hidden');
@@ -61,18 +61,21 @@ saveApiKeyBtn.addEventListener('click', () => {
 
 // Navegación entre Pestañas
 tabCatalog.addEventListener('click', () => {
-    tabCatalog.className = "px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white transition";
-    tabRecommendations.className = "px-4 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
+    tabCatalog.className = "px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white transition cursor-pointer";
+    tabRecommendations.className = "px-4 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition cursor-pointer";
     viewCatalog.classList.remove('hidden');
     viewRecommendations.classList.add('hidden');
 });
 
 tabRecommendations.addEventListener('click', () => {
-    tabRecommendations.className = "px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white transition";
-    tabCatalog.className = "px-4 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
+    tabRecommendations.className = "px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white transition cursor-pointer";
+    tabCatalog.className = "px-4 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition cursor-pointer";
     viewRecommendations.classList.remove('hidden');
     viewCatalog.classList.add('hidden');
-    generateSmartRecommendations();
+    renderFavorites();
+    if (myFavorites.length > 0) {
+        generateSmartRecommendations();
+    }
 });
 
 // 1. Tendencias del Catálogo
@@ -103,7 +106,7 @@ searchInput.addEventListener('input', (e) => {
     }, 400);
 });
 
-// Renderizar Cuadrícula de Medios
+// Renderizar Cuadrícula
 function displayMedia(items, container) {
     container.innerHTML = '';
     if (!items || items.length === 0) {
@@ -136,7 +139,7 @@ function displayMedia(items, container) {
     });
 }
 
-// 2. SISTEMA DE RECOMENDACIONES INTELIGENTES BASADO EN FAVORITOS
+// 2. SISTEMA DE FAVORITOS Y RECOMENDACIONES
 let favSearchTimeout;
 favSearchInput.addEventListener('input', (e) => {
     clearTimeout(favSearchTimeout);
@@ -167,6 +170,13 @@ favSearchInput.addEventListener('input', (e) => {
     }, 300);
 });
 
+// Cerrar sugerencias al hacer clic fuera
+document.addEventListener('click', (e) => {
+    if (!favSearchInput.contains(e.target) && !favSuggestions.contains(e.target)) {
+        favSuggestions.classList.add('hidden');
+    }
+});
+
 window.addFavorite = function(id, type, title) {
     if (myFavorites.some(f => f.id === id && f.type === type)) return;
     myFavorites.push({ id, type, title });
@@ -181,7 +191,11 @@ window.removeFavorite = function(id, type) {
     myFavorites = myFavorites.filter(f => !(f.id === id && f.type === type));
     localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
     renderFavorites();
-    generateSmartRecommendations();
+    if (myFavorites.length > 0) {
+        generateSmartRecommendations();
+    } else {
+        recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-10">Agrega al menos una película o serie favorita arriba para generar recomendaciones personalizadas.</p>';
+    }
 };
 
 function renderFavorites() {
@@ -192,24 +206,18 @@ function renderFavorites() {
     myFavoritesList.innerHTML = myFavorites.map(fav => `
         <span class="bg-zinc-800 border border-zinc-700 text-xs px-3 py-1.5 rounded-xl flex items-center gap-2">
             ${fav.title} (${fav.type === 'tv' ? 'Serie' : 'Película'})
-            <button onclick="removeFavorite(${fav.id}, '${fav.type}')" class="text-zinc-400 hover:text-red-500 font-bold">&times;</button>
+            <button onclick="removeFavorite(${fav.id}, '${fav.type}')" class="text-zinc-400 hover:text-red-500 font-bold cursor-pointer">&times;</button>
         </span>
     `).join('');
 }
 
-// Generar recomendaciones divididas por géneros a partir de los favoritos
 async function generateSmartRecommendations() {
-    if (myFavorites.length === 0) {
-        recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-10">Agrega al menos una película o serie favorita arriba para generar recomendaciones personalizadas.</p>';
-        return;
-    }
-
+    if (myFavorites.length === 0) return;
     recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-10">Analizando tus gustos y buscando recomendaciones por género...</p>';
 
     try {
         let recommendedItemsMap = new Map();
 
-        // 1. Recopilar recomendaciones basadas en cada favorito
         for (let fav of myFavorites) {
             const res = await fetch(`${BASE_URL}/${fav.type}/${fav.id}/recommendations?api_key=${API_KEY}&language=es-ES`);
             const data = await res.json();
@@ -229,27 +237,22 @@ async function generateSmartRecommendations() {
             return;
         }
 
-        // 2. Obtener lista de géneros disponibles en TMDB para clasificar
         const genreRes = await fetch(`${BASE_URL}/genre/movie/list?api_key=${API_KEY}&language=es-ES`);
         const genreData = await genreRes.json();
         const genreMap = new Map(genreData.genres.map(g => [g.id, g.name]));
 
-        // 3. Agrupar recomendaciones por género
         let groupedByGenre = {};
         allRecs.forEach(item => {
             const genreIds = item.genre_ids || [];
             genreIds.forEach(gId => {
                 const genreName = genreMap.get(gId) || 'Otros';
-                if (!groupedByGenre[genreName]) {
-                    groupedByGenre[genreName] = [];
-                }
+                if (!groupedByGenre[genreName]) groupedByGenre[genreName] = [];
                 if (!groupedByGenre[genreName].some(existing => existing.id === item.id)) {
                     groupedByGenre[genreName].push(item);
                 }
             });
         });
 
-        // 4. Renderizar seccionadas por géneros
         recommendationsContainer.innerHTML = '';
         for (let [genre, items] of Object.entries(groupedByGenre)) {
             if (items.length === 0) continue;
@@ -263,7 +266,7 @@ async function generateSmartRecommendations() {
             recommendationsContainer.appendChild(sectionDiv);
 
             const gridTarget = document.getElementById(`genre-grid-${genre.replace(/\s+/g, '')}`);
-            displayMedia(items.slice(0, 5), gridTarget); // Mostrar hasta 5 por género
+            displayMedia(items.slice(0, 5), gridTarget);
         }
 
     } catch (error) {
@@ -272,7 +275,7 @@ async function generateSmartRecommendations() {
     }
 }
 
-// 3. DETALLES Y MAPA DE CALOR DE EPISODIOS
+// 3. DETALLES Y MAPA DE CALOR
 async function fetchMediaDetails(id, type) {
     try {
         let endpoint = `${BASE_URL}/${type}/${id}`;
