@@ -17,21 +17,21 @@
             <h1 class="text-lg sm:text-2xl font-black tracking-wider text-red-600">EL BAÚL DE <span class="text-white">FERNANDO</span></h1>
         </div>
 
-        <!-- Botón Hamburguesa -->
+        <!-- Botón Hamburguesa con disparador directo -->
         <div class="relative">
-            <button id="menuBtn" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 w-11 h-11 rounded-xl flex items-center justify-center transition cursor-pointer" title="Menú">
+            <button id="menuBtn" onclick="toggleMenu(event)" class="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 border border-zinc-700 w-11 h-11 rounded-xl flex items-center justify-center transition cursor-pointer" title="Menú">
                 <svg class="w-6 h-6 text-zinc-200 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
                 </svg>
             </button>
 
-            <!-- Menú Desplegable (Panel Oculto) -->
-            <div id="menuDropdown" class="hidden absolute right-0 mt-2 w-80 max-w-[92vw] bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-2xl z-50 space-y-5">
+            <!-- Menú Desplegable -->
+            <div id="menuDropdown" onclick="event.stopPropagation()" class="hidden absolute right-0 mt-2 w-80 max-w-[92vw] bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-2xl z-50 space-y-5">
                 
-                <!-- Sección 1: Tus Favoritas -->
+                <!-- Sección 1: Favoritas -->
                 <div class="space-y-3">
                     <h2 class="text-sm font-bold text-zinc-100 flex items-center gap-2">🎬 Mis Favoritas (Ya vistas)</h2>
-                    <p class="text-[11px] text-zinc-400">Agrega películas o series para tus recomendaciones.</p>
+                    <p class="text-[11px] text-zinc-400">Agrega películas o series para generar tus recomendaciones.</p>
                     
                     <div class="relative">
                         <input type="text" id="favSearchInput" autocomplete="off" placeholder="Buscar para agregar..." class="w-full bg-zinc-950 border border-zinc-700 px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-red-600 transition">
@@ -45,11 +45,11 @@
 
                 <hr class="border-zinc-800">
 
-                <!-- Sección 2: Configuración de API Key -->
+                <!-- Sección 2: Configuración API Key -->
                 <div class="space-y-3">
                     <h3 class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">⚙️ Configuración de API Key</h3>
                     <input type="password" id="apiKeyInput" placeholder="Pega tu TMDB API Key..." class="w-full bg-zinc-950 border border-zinc-700 px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-red-600">
-                    <button id="saveApiKeyBtn" class="w-full bg-red-600 hover:bg-red-700 text-xs font-bold py-2.5 rounded-xl transition cursor-pointer">Guardar API Key</button>
+                    <button id="saveApiKeyBtn" class="w-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-xs font-bold py-2.5 rounded-xl transition cursor-pointer">Guardar API Key</button>
                 </div>
 
             </div>
@@ -59,6 +59,7 @@
     <!-- Contenido Principal -->
     <main class="container mx-auto px-4 sm:px-6 py-8 flex-grow">
         <section class="space-y-6">
+            <!-- Título limpio sin texto secundario -->
             <div class="border-b border-zinc-800 pb-3">
                 <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Recomendaciones Personalizadas por Género</h2>
             </div>
@@ -82,6 +83,7 @@
         El baúl de fernando — Motor de recomendaciones inteligente.
     </footer>
 
-    <script src="app.js"></script>
+    <!-- Forzar recarga de versión de script para evitar caché del navegador -->
+    <script src="app.js?v=2.1"></script>
 </body>
 </html>
