@@ -63,24 +63,29 @@ favSearchInput.addEventListener('input', (e) => {
         return;
     }
     favSearchTimeout = setTimeout(async () => {
-        const res = await fetch(`${BASE_URL}/search/multi?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        const results = data.results.filter(i => i.media_type === 'movie' || i.media_type === 'tv').slice(0, 5);
-        
-        if (results.length === 0) {
-            favSuggestions.innerHTML = '<div class="p-3 text-xs text-zinc-500">No se encontraron coincidencias.</div>';
-        } else {
-            favSuggestions.innerHTML = results.map(item => {
-                const title = item.title || item.name;
-                const type = item.media_type === 'tv' ? 'tv' : 'movie';
-                const year = (item.release_date || item.first_air_date || '').split('-')[0];
-                return `<div class="p-2.5 hover:bg-zinc-900 cursor-pointer text-xs flex justify-between items-center border-b border-zinc-900" onclick="addFavorite(${item.id}, '${type}', '${title.replace(/'/g, "")}')">
-                    <span class="truncate pr-2"><strong>${title}</strong> (${year || 'N/A'})</span>
-                    <span class="text-red-500 font-bold whitespace-nowrap">+ Agregar</span>
-                </div>`;
-            }).join('');
+        try {
+            const res = await fetch(`${BASE_URL}/search/multi?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            const results = (data.results || []).filter(i => i.media_type === 'movie' || i.media_type === 'tv').slice(0, 5);
+            
+            if (results.length === 0) {
+                favSuggestions.innerHTML = '<div class="p-3 text-xs text-zinc-500">No se encontraron coincidencias.</div>';
+            } else {
+                favSuggestions.innerHTML = results.map(item => {
+                    const title = item.title || item.name;
+                    const type = item.media_type;
+                    const year = (item.release_date || item.first_air_date || '').split('-')[0];
+                    const safeTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    return `<div class="p-2.5 hover:bg-zinc-900 cursor-pointer text-xs flex justify-between items-center border-b border-zinc-900" onclick="addFavorite(${item.id}, '${type}', '${safeTitle}')">
+                        <span class="truncate pr-2"><strong>${title}</strong> (${year || 'N/A'})</span>
+                        <span class="text-red-500 font-bold whitespace-nowrap">+ Agregar</span>
+                    </div>`;
+                }).join('');
+            }
+            favSuggestions.classList.remove('hidden');
+        } catch (err) {
+            console.error("Error buscando:", err);
         }
-        favSuggestions.classList.remove('hidden');
     }, 300);
 });
 
@@ -111,7 +116,7 @@ window.removeFavorite = function(id, type) {
     }
 };
 
-// RENDERIZAR LISTA LATERAL PROFESIONAL
+// RENDERIZAR LISTA LATERAL PROFESIONAL CON BOTÓN FUNCIONAL
 function renderFavorites() {
     if (myFavorites.length === 0) {
         myFavoritesList.innerHTML = '<p class="text-xs text-zinc-500 italic text-center py-4">No hay elementos registrados.</p>';
@@ -122,7 +127,7 @@ function renderFavorites() {
             <span class="truncate pr-2 font-medium text-zinc-200" title="${fav.title}">${fav.title}</span>
             <div class="flex items-center gap-2">
                 <span class="text-[10px] text-zinc-500 uppercase">${fav.type === 'tv' ? 'Serie' : 'Película'}</span>
-                <button onclick="removeFavorite(${fav.id}, '${fav.type}')" class="text-zinc-500 hover:text-red-500 font-bold text-sm px-1 cursor-pointer transition" title="Eliminar">&times;</button>
+                <button type="button" onclick="removeFavorite(${fav.id}, '${fav.type}')" class="text-zinc-400 hover:text-red-500 font-bold text-base px-1.5 cursor-pointer transition" title="Eliminar">&times;</button>
             </div>
         </div>
     `).join('');
@@ -151,7 +156,7 @@ async function generateSmartRecommendations() {
         let allRecs = Array.from(recommendedItemsMap.values());
 
         if (allRecs.length === 0) {
-            recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-16 bg-zinc-900/30 rounded-2xl border border-zinc-900">No hay suficientes recomendaciones aún. ¡Agrega más favoritas!</p>';
+            recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-16 bg-zinc-900/30 rounded-2xl border border-zinc-900">No hay suficientes recomendaciones para los elementos actuales. ¡Prueba agregando otras series o películas!</p>';
             return;
         }
 
@@ -193,7 +198,7 @@ async function generateSmartRecommendations() {
     }
 }
 
-// RENDERIZAR TARJETAS EN RECOMENDACIONES
+// RENDERIZAR TARJETAS
 function displayMediaCards(items, container) {
     container.innerHTML = '';
     items.forEach(item => {
