@@ -7,6 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+        /* Ocultar barra de scroll en el filtro horizontal de géneros */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-zinc-950 text-white font-sans antialiased min-h-screen flex flex-col justify-between">
@@ -17,7 +20,7 @@
             <h1 class="text-lg sm:text-2xl font-black tracking-wider text-red-600">EL BAÚL DE <span class="text-white">FERNANDO</span></h1>
         </div>
 
-        <!-- Botón Hamburguesa con disparador directo -->
+        <!-- Botón Hamburguesa -->
         <div class="relative">
             <button id="menuBtn" onclick="toggleMenu(event)" class="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 border border-zinc-700 w-11 h-11 rounded-xl flex items-center justify-center transition cursor-pointer" title="Menú">
                 <svg class="w-6 h-6 text-zinc-200 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -27,7 +30,6 @@
 
             <!-- Menú Desplegable -->
             <div id="menuDropdown" onclick="event.stopPropagation()" class="hidden absolute right-0 mt-2 w-80 max-w-[92vw] bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-2xl z-50 space-y-5">
-                
                 <!-- Sección 1: Favoritas -->
                 <div class="space-y-3">
                     <h2 class="text-sm font-bold text-zinc-100 flex items-center gap-2">🎬 Mis Favoritas (Ya vistas)</h2>
@@ -51,17 +53,40 @@
                     <input type="password" id="apiKeyInput" placeholder="Pega tu TMDB API Key..." class="w-full bg-zinc-950 border border-zinc-700 px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-red-600">
                     <button id="saveApiKeyBtn" class="w-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-xs font-bold py-2.5 rounded-xl transition cursor-pointer">Guardar API Key</button>
                 </div>
-
             </div>
         </div>
     </header>
 
     <!-- Contenido Principal -->
-    <main class="container mx-auto px-4 sm:px-6 py-8 flex-grow">
+    <main class="container mx-auto px-4 sm:px-6 py-6 flex-grow space-y-6">
+
+        <!-- 1. Tarjetas de filtro de tipo: Todo / Series / Películas -->
+        <section class="grid grid-cols-3 gap-3 sm:gap-4 max-w-xl mx-auto">
+            <button id="filterAll" onclick="setTypeFilter('all')" class="bg-red-600 text-white border border-red-500 py-3 rounded-2xl font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-1 shadow-lg transition active:scale-95 cursor-pointer">
+                <span class="text-base sm:text-lg">✨</span>
+                <span>Todo</span>
+            </button>
+            <button id="filterTv" onclick="setTypeFilter('tv')" class="bg-zinc-900 text-zinc-400 border border-zinc-800 py-3 rounded-2xl font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-1 transition hover:border-zinc-700 active:scale-95 cursor-pointer">
+                <span class="text-base sm:text-lg">📺</span>
+                <span>Series</span>
+            </button>
+            <button id="filterMovie" onclick="setTypeFilter('movie')" class="bg-zinc-900 text-zinc-400 border border-zinc-800 py-3 rounded-2xl font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-1 transition hover:border-zinc-700 active:scale-95 cursor-pointer">
+                <span class="text-base sm:text-lg">🎬</span>
+                <span>Películas</span>
+            </button>
+        </section>
+
+        <!-- 2. Filtro Horizontal de Géneros -->
+        <section class="space-y-2">
+            <div id="genresBar" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                <!-- Se inyectan los chips de géneros dinámicamente -->
+            </div>
+        </section>
+
+        <!-- 3. Contenedor de Recomendaciones -->
         <section class="space-y-6">
-            <!-- Título limpio sin texto secundario -->
             <div class="border-b border-zinc-800 pb-3">
-                <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Recomendaciones Personalizadas por Género</h2>
+                <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Recomendaciones</h2>
             </div>
 
             <div id="recommendationsContainer" class="space-y-10">
@@ -83,7 +108,6 @@
         El baúl de fernando — Motor de recomendaciones inteligente.
     </footer>
 
-    <!-- Forzar recarga de versión de script para evitar caché del navegador -->
-    <script src="app.js?v=2.1"></script>
+    <script src="app.js?v=3.0"></script>
 </body>
 </html>
