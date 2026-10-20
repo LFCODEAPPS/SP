@@ -1,40 +1,31 @@
-// --- FUNCIÓN GLOBAL DE APERTURA DEL MENÚ ---
-window.toggleMenu = function(e) {
-    if (e) {
-        e.stopPropagation();
-        e.preventDefault();
-    }
-    const menu = document.getElementById('menuDropdown');
-    if (menu) {
-        menu.classList.toggle('hidden');
-    }
-};
-
-document.addEventListener('click', (e) => {
-    const menu = document.getElementById('menuDropdown');
-    const btn = document.getElementById('menuBtn');
-    if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
-        menu.classList.add('hidden');
-    }
-    const suggestions = document.getElementById('favSuggestions');
-    if (suggestions) {
-        suggestions.classList.add('hidden');
-    }
-});
-
-// CLAVE INTEGRADA DIRECTAMENTE EN EL CÓDIGO
+// CLAVE DE TMDB INTEGRADA
 const API_KEY = '7d59a5a92c91b35391c39a6491fa05f9';
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_URL = 'https://image.tmdb.org/t/p/w500';
 
-const favSearchInput = document.getElementById('favSearchInput');
-const favSuggestions = document.getElementById('favSuggestions');
-const myFavoritesList = document.getElementById('myFavoritesList');
-const myWatchlist = document.getElementById('myWatchlist');
-const watchlistCount = document.getElementById('watchlistCount');
+// Elementos de Vistas
+const viewFeed = document.getElementById('viewFeed');
+const viewWatchlist = document.getElementById('viewWatchlist');
+const viewFavorites = document.getElementById('viewFavorites');
+
+const navFeed = document.getElementById('navFeed');
+const navWatchlist = document.getElementById('navWatchlist');
+const navFavorites = document.getElementById('navFavorites');
+
+const badgeWatchlist = document.getElementById('badgeWatchlist');
+const badgeFavorites = document.getElementById('badgeFavorites');
+
+// Contenedores
 const recommendationsContainer = document.getElementById('recommendationsContainer');
+const watchlistGrid = document.getElementById('watchlistGrid');
+const favoritesGrid = document.getElementById('favoritesGrid');
 const genresBar = document.getElementById('genresBar');
 
+// Buscador de favoritas
+const favSearchInput = document.getElementById('favSearchInput');
+const favSuggestions = document.getElementById('favSuggestions');
+
+// Modal
 const detailModal = document.getElementById('detailModal');
 const closeModal = document.getElementById('closeModal');
 const modalBody = document.getElementById('modalBody');
@@ -46,28 +37,62 @@ let myFavorites = rawFavorites.filter(item => item && typeof item === 'object' &
 let rawWatchlist = JSON.parse(localStorage.getItem('fernando_watchlist')) || [];
 let myWatchlistItems = rawWatchlist.filter(item => item && typeof item === 'object' && item.id && item.type);
 
-// Filtros activos
+// Filtros
 let currentTypeFilter = 'all'; // 'all', 'tv', 'movie'
 let currentGenreFilter = 'all';
 let allLoadedRecommendations = [];
 let genreMap = new Map();
 
-// Iniciar app directamente
-renderFavorites();
-renderWatchlist();
+// --- NAVEGACIÓN ENTRE VISTAS ---
+window.switchView = function(viewName) {
+    viewFeed.classList.add('hidden');
+    viewWatchlist.classList.add('hidden');
+    viewFavorites.classList.add('hidden');
+
+    const activeNav = "px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer bg-white text-zinc-950 shadow-md";
+    const inactiveNav = "px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer text-zinc-400 hover:text-white";
+
+    navFeed.className = `flex-1 sm:flex-initial ${viewName === 'feed' ? activeNav : inactiveNav}`;
+    navWatchlist.className = `flex-1 sm:flex-initial flex items-center justify-center gap-1.5 ${viewName === 'watchlist' ? activeNav : inactiveNav}`;
+    navFavorites.className = `flex-1 sm:flex-initial flex items-center justify-center gap-1.5 ${viewName === 'favorites' ? activeNav : inactiveNav}`;
+
+    if (viewName === 'feed') {
+        viewFeed.classList.remove('hidden');
+    } else if (viewName === 'watchlist') {
+        viewWatchlist.classList.remove('hidden');
+        renderWatchlistCatalog();
+    } else if (viewName === 'favorites') {
+        viewFavorites.classList.remove('hidden');
+        renderFavoritesCatalog();
+    }
+};
+
+// Actualizar contadores numéricos
+function updateBadges() {
+    if (badgeWatchlist) badgeWatchlist.textContent = myWatchlistItems.length;
+    if (badgeFavorites) badgeFavorites.textContent = myFavorites.length;
+}
+
+// Iniciar aplicación
+updateBadges();
 if (myFavorites.length > 0) {
     generateSmartRecommendations();
 }
 
-// BUSCADOR EN EL MENÚ (FAVORITAS / VISTAS)
+// Cerrar sugerencias al hacer clic fuera
+document.addEventListener('click', (e) => {
+    if (favSearchInput && favSuggestions && !favSearchInput.contains(e.target) && !favSuggestions.contains(e.target)) {
+        favSuggestions.classList.add('hidden');
+    }
+});
+
+// BUSCADOR EN VISTA FAVORITAS
 let favSearchTimeout;
 favSearchInput.addEventListener('input', (e) => {
     clearTimeout(favSearchTimeout);
     const q = e.target.value.trim();
-    
     if (!q) {
         favSuggestions.classList.add('hidden');
-        favSuggestions.innerHTML = '';
         return;
     }
 
@@ -75,8 +100,8 @@ favSearchInput.addEventListener('input', (e) => {
         try {
             const res = await fetch(`${BASE_URL}/search/multi?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(q)}`);
             const data = await res.json();
-            const results = (data.results || []).filter(i => i.media_type === 'movie' || i.media_type === 'tv').slice(0, 5);
-            
+            const results = (data.results || []).filter(i => i.media_type === 'movie' || i.media_type === 'tv').slice(0, 6);
+
             if (results.length === 0) {
                 favSuggestions.innerHTML = '<div class="p-3 text-xs text-zinc-500">No se encontraron coincidencias.</div>';
             } else {
@@ -84,120 +109,191 @@ favSearchInput.addEventListener('input', (e) => {
                     const title = item.title || item.name;
                     const type = item.media_type;
                     const year = (item.release_date || item.first_air_date || '').split('-')[0];
+                    const poster = item.poster_path ? `${IMG_URL}${item.poster_path}` : '';
                     const safeTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    return `<div class="p-2.5 hover:bg-zinc-900 cursor-pointer text-xs flex justify-between items-center border-b border-zinc-900/50 transition" onclick="addFavorite(${item.id}, '${type}', '${safeTitle}')">
-                        <span class="truncate pr-2 text-zinc-200"><strong>${title}</strong> (${year || 'N/A'})</span>
-                        <span class="text-red-500 font-bold whitespace-nowrap">+ Agregar</span>
-                    </div>`;
+                    const safePoster = (item.poster_path || '').replace(/'/g, "\\'");
+
+                    return `
+                        <div class="p-2.5 hover:bg-zinc-900 cursor-pointer text-xs flex items-center justify-between border-b border-zinc-900/50 transition gap-2" onclick="addFavorite(${item.id}, '${type}', '${safeTitle}', '${safePoster}', '${year}')">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                ${poster ? `<img src="${poster}" class="w-7 h-10 object-cover rounded flex-shrink-0">` : `<div class="w-7 h-10 bg-zinc-800 rounded flex-shrink-0"></div>`}
+                                <div class="truncate">
+                                    <div class="font-bold text-zinc-100 truncate">${title}</div>
+                                    <div class="text-[10px] text-zinc-500">${year || 'N/A'} • ${type === 'tv' ? 'Serie' : 'Película'}</div>
+                                </div>
+                            </div>
+                            <span class="text-red-500 font-bold whitespace-nowrap text-xs">+ Agregar</span>
+                        </div>
+                    `;
                 }).join('');
             }
             favSuggestions.classList.remove('hidden');
         } catch (err) {
-            console.error("Error buscando:", err);
+            console.error(err);
         }
     }, 250);
 });
 
 // GESTIÓN DE FAVORITAS (YA VISTAS)
-window.addFavorite = function(id, type, title) {
+window.addFavorite = function(id, type, title, poster_path = '', release_date = '') {
     if (myFavorites.some(f => f.id === id && f.type === type)) {
         favSearchInput.value = '';
         favSuggestions.classList.add('hidden');
         return;
     }
-    myFavorites.unshift({ id, type, title });
+    myFavorites.unshift({ id, type, title, poster_path, release_date });
     localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
-    
-    // Si estaba en "Por ver", la removemos de ahí automáticamente
+
+    // Si estaba en Por Ver, se remueve
     removeWatchlist(id, type, false);
 
     favSearchInput.value = '';
     favSuggestions.classList.add('hidden');
-    renderFavorites();
+    updateBadges();
+    renderFavoritesCatalog();
     generateSmartRecommendations();
 };
 
 window.removeFavorite = function(id, type) {
     myFavorites = myFavorites.filter(f => !(f.id === id && f.type === type));
     localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
-    renderFavorites();
+    updateBadges();
+    renderFavoritesCatalog();
     if (myFavorites.length > 0) {
         generateSmartRecommendations();
     } else {
         allLoadedRecommendations = [];
         genresBar.innerHTML = '';
-        recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4 text-xs sm:text-sm">Agrega al menos una película o serie favorita en el menú hamburguesa para comenzar.</p>';
+        recommendationsContainer.innerHTML = '<p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4 text-xs sm:text-sm">Ve a la pestaña <strong>Favoritas</strong> para registrar lo que ya viste y generar tus sugerencias personalizadas.</p>';
     }
 };
 
-function renderFavorites() {
+// RENDERIZAR CATÁLOGO DE FAVORITAS (PANTALLA COMPLETA CON CARÁTULAS)
+function renderFavoritesCatalog() {
     if (myFavorites.length === 0) {
-        myFavoritesList.innerHTML = '<p class="text-xs text-zinc-500 italic text-center py-2">No hay elementos registrados.</p>';
+        favoritesGrid.innerHTML = `
+            <div class="col-span-full text-center py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">
+                <p class="text-zinc-400 text-sm font-semibold">No tienes películas o series registradas aún.</p>
+                <p class="text-zinc-500 text-xs mt-1">Usa el buscador de arriba para agregar tus preferidas.</p>
+            </div>
+        `;
         return;
     }
-    myFavoritesList.innerHTML = myFavorites.map(fav => `
-        <div class="bg-zinc-950 border border-zinc-800 px-3 py-1.5 rounded-xl flex justify-between items-center text-xs group hover:border-zinc-700 transition">
-            <span class="truncate pr-2 font-medium text-zinc-200" title="${fav.title}">${fav.title}</span>
-            <div class="flex items-center gap-2">
-                <span class="text-[9px] ${fav.type === 'tv' ? 'text-emerald-400 font-semibold' : 'text-amber-500 font-semibold'} uppercase">${fav.type === 'tv' ? 'Serie' : 'Película'}</span>
-                <button type="button" onclick="removeFavorite(${fav.id}, '${fav.type}')" class="text-zinc-400 hover:text-red-500 font-bold text-base px-1.5 cursor-pointer transition" title="Eliminar">&times;</button>
+
+    favoritesGrid.innerHTML = myFavorites.map(fav => {
+        const poster = fav.poster_path 
+            ? (fav.poster_path.startsWith('http') ? fav.poster_path : `${IMG_URL}${fav.poster_path}`)
+            : 'https://via.placeholder.com/500x750?text=Sin+Imagen';
+
+        const typeBadge = fav.type === 'tv' 
+            ? '<span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-800/60 px-1.5 py-0.5 rounded">Serie</span>' 
+            : '<span class="text-[10px] font-bold text-amber-500 bg-amber-950/70 border border-amber-800/60 px-1.5 py-0.5 rounded">Película</span>';
+
+        return `
+            <div class="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col group relative">
+                <div class="relative overflow-hidden aspect-[2/3] cursor-pointer" onclick="fetchMediaDetails(${fav.id}, '${fav.type}')">
+                    <img src="${poster}" alt="${fav.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                    <button type="button" onclick="event.stopPropagation(); removeFavorite(${fav.id}, '${fav.type}')" 
+                        class="absolute top-2 right-2 bg-black/75 hover:bg-red-600 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition shadow-lg" title="Quitar de favoritas">
+                        &times;
+                    </button>
+                </div>
+                <div class="p-3 flex flex-col flex-grow justify-between gap-1.5">
+                    <div class="flex items-center gap-1.5 overflow-hidden">
+                        ${typeBadge}
+                        <h4 class="font-bold text-xs text-zinc-100 truncate">${fav.title}</h4>
+                    </div>
+                    <p class="text-[11px] text-zinc-500">${fav.release_date || ''}</p>
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
-// GESTIÓN DE WATCHLIST ("POR VER / PENDIENTES")
-window.addToWatchlist = function(id, type, title, event) {
+// GESTIÓN DE WATCHLIST ("POR VER")
+window.addToWatchlist = function(id, type, title, poster_path = '', release_date = '', event) {
     if (event) event.stopPropagation();
-    if (myWatchlistItems.some(w => w.id === id && w.type === type)) {
-        alert('Ya está en tu lista de "Por Ver"');
-        return;
-    }
-    myWatchlistItems.unshift({ id, type, title });
+    if (myWatchlistItems.some(w => w.id === id && w.type === type)) return;
+
+    myWatchlistItems.unshift({ id, type, title, poster_path, release_date });
     localStorage.setItem('fernando_watchlist', JSON.stringify(myWatchlistItems));
-    renderWatchlist();
-    renderFilteredFeed(); // actualiza estado visual en botones
+    updateBadges();
+    renderFilteredFeed();
+    if (!viewWatchlist.classList.contains('hidden')) {
+        renderWatchlistCatalog();
+    }
 };
 
 window.removeWatchlist = function(id, type, shouldRender = true) {
     myWatchlistItems = myWatchlistItems.filter(w => !(w.id === id && w.type === type));
     localStorage.setItem('fernando_watchlist', JSON.stringify(myWatchlistItems));
+    updateBadges();
     if (shouldRender) {
-        renderWatchlist();
         renderFilteredFeed();
+        renderWatchlistCatalog();
     }
 };
 
-window.markAsWatched = function(id, type, title) {
-    addFavorite(id, type, title);
+window.markAsWatched = function(id, type, title, poster_path, release_date, event) {
+    if (event) event.stopPropagation();
+    addFavorite(id, type, title, poster_path, release_date);
     removeWatchlist(id, type);
 };
 
-function renderWatchlist() {
-    if (watchlistCount) watchlistCount.textContent = myWatchlistItems.length;
-
+// RENDERIZAR CATÁLOGO "POR VER" (PANTALLA COMPLETA CON CARÁTULAS)
+function renderWatchlistCatalog() {
     if (myWatchlistItems.length === 0) {
-        myWatchlist.innerHTML = '<p class="text-xs text-zinc-500 italic text-center py-2">Aún no has guardado nada en tu lista.</p>';
+        watchlistGrid.innerHTML = `
+            <div class="col-span-full text-center py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">
+                <p class="text-zinc-400 text-sm font-semibold">Tu lista de pendientes está vacía.</p>
+                <p class="text-zinc-500 text-xs mt-1">Explora las recomendaciones y pulsa "+ Por ver" en las que quieras comenzar.</p>
+            </div>
+        `;
         return;
     }
 
-    myWatchlist.innerHTML = myWatchlistItems.map(item => `
-        <div class="bg-zinc-950 border border-zinc-800 px-3 py-2 rounded-xl flex justify-between items-center text-xs group hover:border-zinc-700 transition">
-            <div class="flex flex-col min-w-0 pr-2">
-                <span class="truncate font-medium text-zinc-200" title="${item.title}">${item.title}</span>
-                <span class="text-[9px] ${item.type === 'tv' ? 'text-emerald-400' : 'text-amber-500'} uppercase font-semibold">${item.type === 'tv' ? 'Serie' : 'Película'}</span>
+    watchlistGrid.innerHTML = myWatchlistItems.map(item => {
+        const poster = item.poster_path 
+            ? (item.poster_path.startsWith('http') ? item.poster_path : `${IMG_URL}${item.poster_path}`)
+            : 'https://via.placeholder.com/500x750?text=Sin+Imagen';
+
+        const safeTitle = item.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const safePoster = (item.poster_path || '').replace(/'/g, "\\'");
+
+        const typeBadge = item.type === 'tv' 
+            ? '<span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-800/60 px-1.5 py-0.5 rounded">Serie</span>' 
+            : '<span class="text-[10px] font-bold text-amber-500 bg-amber-950/70 border border-amber-800/60 px-1.5 py-0.5 rounded">Película</span>';
+
+        return `
+            <div class="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col group relative">
+                <div class="relative overflow-hidden aspect-[2/3] cursor-pointer" onclick="fetchMediaDetails(${item.id}, '${item.type}')">
+                    <img src="${poster}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                    <button type="button" onclick="event.stopPropagation(); removeWatchlist(${item.id}, '${item.type}')" 
+                        class="absolute top-2 right-2 bg-black/75 hover:bg-red-600 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition shadow-lg" title="Quitar de la lista">
+                        &times;
+                    </button>
+                </div>
+                <div class="p-3 flex flex-col flex-grow justify-between gap-2.5">
+                    <div>
+                        <div class="flex items-center gap-1.5 overflow-hidden">
+                            ${typeBadge}
+                            <h4 class="font-bold text-xs text-zinc-100 truncate">${item.title}</h4>
+                        </div>
+                        <p class="text-[11px] text-zinc-500 mt-0.5">${item.release_date || ''}</p>
+                    </div>
+
+                    <!-- Botón para marcar como vista directamente -->
+                    <button type="button" onclick="markAsWatched(${item.id}, '${item.type}', '${safeTitle}', '${safePoster}', '${item.release_date || ''}', event)"
+                        class="w-full bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-700/70 text-emerald-300 font-bold text-[11px] py-1.5 rounded-lg transition flex items-center justify-center gap-1 shadow">
+                        <span>✔ Ya la vi</span>
+                    </button>
+                </div>
             </div>
-            <div class="flex items-center gap-1">
-                <button type="button" onclick="markAsWatched(${item.id}, '${item.type}', '${item.title.replace(/'/g, "\\'")}')" class="bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-lg transition" title="Marcar como ya vista">
-                    ✔ Ya la vi
-                </button>
-                <button type="button" onclick="removeWatchlist(${item.id}, '${item.type}')" class="text-zinc-500 hover:text-red-500 font-bold text-base px-1.5 transition" title="Quitar">&times;</button>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
-// CONTROL DE FILTRO: TODO / SERIES / PELÍCULAS
+// CONTROL DE FILTRO DE TIPO EN RECOMENDACIONES
 window.setTypeFilter = function(type) {
     currentTypeFilter = type;
     currentGenreFilter = 'all';
@@ -322,7 +418,7 @@ async function generateSmartRecommendations() {
         ]);
         const genreMovieData = await genreMovieRes.json();
         const genreTvData = await genreTvRes.json();
-        
+
         genreMap = new Map();
         (genreMovieData.genres || []).forEach(g => genreMap.set(g.id, g.name));
         (genreTvData.genres || []).forEach(g => genreMap.set(g.id, g.name));
@@ -331,7 +427,7 @@ async function generateSmartRecommendations() {
         renderFilteredFeed();
 
     } catch (error) {
-        console.error("Error generando recomendaciones:", error);
+        console.error("Error:", error);
         recommendationsContainer.innerHTML = '<p class="text-center text-red-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Ocurrió un error al calcular tus recomendaciones.</p>';
     }
 }
@@ -387,18 +483,19 @@ function renderFilteredFeed() {
     }
 }
 
-// RENDERIZAR TARJETAS EN FEED (CON BOTÓN "+ Por ver")
+// RENDERIZAR TARJETAS EN FEED (CON PORTADA Y BOTÓN DIRECTO "+ Por ver")
 function displayMediaCards(items, container) {
     container.innerHTML = '';
     items.forEach(item => {
         const { id, title, name, poster_path, vote_average, release_date, first_air_date, media_type } = item;
         const mediaTitle = title || name;
-        const date = release_date || first_air_date;
+        const date = (release_date || first_air_date || '').split('-')[0];
         const poster = poster_path ? `${IMG_URL}${poster_path}` : 'https://via.placeholder.com/500x750?text=Sin+Imagen';
         const realType = media_type || (title ? 'movie' : 'tv');
 
         const isSaved = myWatchlistItems.some(w => w.id === id && w.type === realType);
         const safeTitle = mediaTitle.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const safePoster = (poster_path || '').replace(/'/g, "\\'");
 
         const typeBadge = realType === 'tv' 
             ? '<span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-1.5 py-0.5 rounded">Serie</span>' 
@@ -411,9 +508,8 @@ function displayMediaCards(items, container) {
                 <img src="${poster}" alt="${mediaTitle}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
                 <span class="absolute top-2 right-2 bg-black/70 backdrop-blur-md text-xs font-bold px-2 py-1 rounded text-amber-400">⭐ ${vote_average ? vote_average.toFixed(1) : 'N/A'}</span>
                 
-                <!-- Botón directo "+ Por ver" en la portada -->
-                <button type="button" onclick="${isSaved ? `removeWatchlist(${id}, '${realType}', true)` : `addToWatchlist(${id}, '${realType}', '${safeTitle}', event)`}" 
-                    class="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-1 rounded-lg backdrop-blur-md border transition ${isSaved ? 'bg-red-600 text-white border-red-500' : 'bg-black/70 text-zinc-300 border-zinc-700 hover:border-white'}">
+                <button type="button" onclick="${isSaved ? `removeWatchlist(${id}, '${realType}', true)` : `addToWatchlist(${id}, '${realType}', '${safeTitle}', '${safePoster}', '${date}', event)`}" 
+                    class="absolute bottom-2 right-2 text-[10px] font-bold px-2.5 py-1 rounded-lg backdrop-blur-md border transition ${isSaved ? 'bg-red-600 text-white border-red-500' : 'bg-black/75 text-zinc-300 border-zinc-700 hover:border-white'}">
                     ${isSaved ? '✓ En lista' : '+ Por ver'}
                 </button>
             </div>
@@ -422,7 +518,7 @@ function displayMediaCards(items, container) {
                     ${typeBadge}
                     <h4 class="font-bold text-xs text-zinc-100 truncate">${mediaTitle}</h4>
                 </div>
-                <p class="text-[11px] text-zinc-500">${date ? date.split('-')[0] : ''}</p>
+                <p class="text-[11px] text-zinc-500">${date}</p>
             </div>
         `;
         card.addEventListener('click', (e) => {
@@ -433,7 +529,7 @@ function displayMediaCards(items, container) {
     });
 }
 
-// OBTENER DETALLES Y PROVEEDORES
+// DETALLES Y PROVEEDORES
 async function fetchMediaDetails(id, type) {
     try {
         let endpoint = `${BASE_URL}/${type}/${id}`;
@@ -480,11 +576,13 @@ function showMovieModal(movie, providers) {
     const backdrop = movie.backdrop_path ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}` : '';
     const rating = movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A';
     const voteCount = movie.vote_count ? movie.vote_count.toLocaleString() : '0';
+    const year = (movie.release_date || '').split('-')[0];
 
     const trailerSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' trailer espanol latino')}`;
     const reviewSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' critica reseña')}`;
     const isSaved = myWatchlistItems.some(w => w.id === movie.id && w.type === 'movie');
     const safeTitle = movie.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safePoster = (movie.poster_path || '').replace(/'/g, "\\'");
 
     modalBody.innerHTML = `
         <div class="relative h-56 sm:h-72 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-4 bg-cover bg-center flex items-end p-4 sm:p-6" style="background-image: url('${backdrop}');">
@@ -496,7 +594,6 @@ function showMovieModal(movie, providers) {
         </div>
 
         <div class="space-y-5 text-sm text-zinc-300">
-            <!-- Calificación y Botón para Agregar a "Por Ver" -->
             <div class="flex items-center justify-between gap-3 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
                 <div class="flex items-center gap-3">
                     <span class="text-xl">⭐</span>
@@ -505,9 +602,9 @@ function showMovieModal(movie, providers) {
                         <div class="text-[11px] text-zinc-500">${voteCount} votos</div>
                     </div>
                 </div>
-                <button type="button" onclick="${isSaved ? `removeWatchlist(${movie.id}, 'movie', true)` : `addToWatchlist(${movie.id}, 'movie', '${safeTitle}')`}; showMovieModal(${JSON.stringify(movie).replace(/"/g, '&quot;')}, ${JSON.stringify(providers).replace(/"/g, '&quot;')});" 
+                <button type="button" onclick="${isSaved ? `removeWatchlist(${movie.id}, 'movie', true)` : `addToWatchlist(${movie.id}, 'movie', '${safeTitle}', '${safePoster}', '${year}')`}; showMovieModal(${JSON.stringify(movie).replace(/"/g, '&quot;')}, ${JSON.stringify(providers).replace(/"/g, '&quot;')});" 
                     class="px-3 py-2 rounded-xl text-xs font-bold transition border ${isSaved ? 'bg-red-600 text-white border-red-500' : 'bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700'}">
-                    ${isSaved ? '✓ En tu lista Por Ver' : '+ Agregar a Por Ver'}
+                    ${isSaved ? '✓ En lista Por Ver' : '+ Agregar a Por Ver'}
                 </button>
             </div>
 
@@ -544,12 +641,14 @@ async function showTvModal(tv, providers) {
     const backdrop = tv.backdrop_path ? `https://image.tmdb.org/t/p/original${tv.backdrop_path}` : '';
     const rating = tv.vote_average ? tv.vote_average.toFixed(1) : 'N/A';
     const voteCount = tv.vote_count ? tv.vote_count.toLocaleString() : '0';
+    const year = (tv.first_air_date || '').split('-')[0];
 
     let seasonsHtml = tv.seasons.filter(s => s.season_number > 0).map(s => `<option value="${s.season_number}">Temporada ${s.season_number} (${s.episode_count} eps)</option>`).join('');
 
     const reviewSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(tv.name + ' critica serie resena')}`;
     const isSaved = myWatchlistItems.some(w => w.id === tv.id && w.type === 'tv');
     const safeTitle = tv.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safePoster = (tv.poster_path || '').replace(/'/g, "\\'");
 
     modalBody.innerHTML = `
         <div class="relative h-56 sm:h-72 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-4 bg-cover bg-center flex items-end p-4 sm:p-6" style="background-image: url('${backdrop}');">
@@ -561,7 +660,6 @@ async function showTvModal(tv, providers) {
         </div>
 
         <div class="space-y-5 text-sm text-zinc-300">
-            <!-- Calificación y Botón para Agregar a "Por Ver" -->
             <div class="flex items-center justify-between gap-3 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
                 <div class="flex items-center gap-3">
                     <span class="text-xl">⭐</span>
@@ -570,9 +668,9 @@ async function showTvModal(tv, providers) {
                         <div class="text-[11px] text-zinc-500">${voteCount} votos</div>
                     </div>
                 </div>
-                <button type="button" onclick="${isSaved ? `removeWatchlist(${tv.id}, 'tv', true)` : `addToWatchlist(${tv.id}, 'tv', '${safeTitle}')`}; showTvModal(${JSON.stringify(tv).replace(/"/g, '&quot;')}, ${JSON.stringify(providers).replace(/"/g, '&quot;')});" 
+                <button type="button" onclick="${isSaved ? `removeWatchlist(${tv.id}, 'tv', true)` : `addToWatchlist(${tv.id}, 'tv', '${safeTitle}', '${safePoster}', '${year}')`}; showTvModal(${JSON.stringify(tv).replace(/"/g, '&quot;')}, ${JSON.stringify(providers).replace(/"/g, '&quot;')});" 
                     class="px-3 py-2 rounded-xl text-xs font-bold transition border ${isSaved ? 'bg-red-600 text-white border-red-500' : 'bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700'}">
-                    ${isSaved ? '✓ En tu lista Por Ver' : '+ Agregar a Por Ver'}
+                    ${isSaved ? '✓ En lista Por Ver' : '+ Agregar a Por Ver'}
                 </button>
             </div>
 
