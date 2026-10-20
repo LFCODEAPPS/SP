@@ -4,10 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>El baúl de fernando</title>
+
+    <!-- Icono para pantalla de inicio en iOS (iPhone / iPad) y favicon -->
+    <link rel="apple-touch-icon" href="iconop.png">
+    <link rel="icon" type="image/png" href="iconop.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="El Baúl">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
-        /* Ocultar barra de scroll en el filtro horizontal de géneros */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -30,7 +37,6 @@
 
             <!-- Menú Desplegable -->
             <div id="menuDropdown" onclick="event.stopPropagation()" class="hidden absolute right-0 mt-2 w-80 max-w-[92vw] bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-2xl z-50 space-y-5">
-                <!-- Sección 1: Favoritas -->
                 <div class="space-y-3">
                     <h2 class="text-sm font-bold text-zinc-100 flex items-center gap-2">🎬 Mis Favoritas (Ya vistas)</h2>
                     <p class="text-[11px] text-zinc-400">Agrega películas o series para generar tus recomendaciones.</p>
@@ -47,7 +53,6 @@
 
                 <hr class="border-zinc-800">
 
-                <!-- Sección 2: Configuración API Key -->
                 <div class="space-y-3">
                     <h3 class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">⚙️ Configuración de API Key</h3>
                     <input type="password" id="apiKeyInput" placeholder="Pega tu TMDB API Key..." class="w-full bg-zinc-950 border border-zinc-700 px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-red-600">
@@ -58,29 +63,24 @@
     </header>
 
     <!-- Contenido Principal -->
-    <main class="container mx-auto px-4 sm:px-6 py-6 flex-grow space-y-6">
+    <main class="container mx-auto px-4 sm:px-6 py-5 flex-grow space-y-5">
 
-        <!-- 1. Tarjetas de filtro de tipo: Todo / Series / Películas -->
-        <section class="grid grid-cols-3 gap-3 sm:gap-4 max-w-xl mx-auto">
-            <button id="filterAll" onclick="setTypeFilter('all')" class="bg-red-600 text-white border border-red-500 py-3 rounded-2xl font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-1 shadow-lg transition active:scale-95 cursor-pointer">
-                <span class="text-base sm:text-lg">✨</span>
-                <span>Todo</span>
+        <!-- 1. Botones de filtro compactos, sin iconos y con colores dinámicos -->
+        <section class="flex items-center justify-center gap-2 max-w-sm mx-auto">
+            <button id="filterAll" onclick="setTypeFilter('all')" class="flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition active:scale-95 cursor-pointer bg-white text-zinc-950 border-white shadow-md">
+                Todo
             </button>
-            <button id="filterTv" onclick="setTypeFilter('tv')" class="bg-zinc-900 text-zinc-400 border border-zinc-800 py-3 rounded-2xl font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-1 transition hover:border-zinc-700 active:scale-95 cursor-pointer">
-                <span class="text-base sm:text-lg">📺</span>
-                <span>Series</span>
+            <button id="filterTv" onclick="setTypeFilter('tv')" class="flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition active:scale-95 cursor-pointer bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700">
+                Series
             </button>
-            <button id="filterMovie" onclick="setTypeFilter('movie')" class="bg-zinc-900 text-zinc-400 border border-zinc-800 py-3 rounded-2xl font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-1 transition hover:border-zinc-700 active:scale-95 cursor-pointer">
-                <span class="text-base sm:text-lg">🎬</span>
-                <span>Películas</span>
+            <button id="filterMovie" onclick="setTypeFilter('movie')" class="flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition active:scale-95 cursor-pointer bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700">
+                Películas
             </button>
         </section>
 
         <!-- 2. Filtro Horizontal de Géneros -->
-        <section class="space-y-2">
-            <div id="genresBar" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-                <!-- Se inyectan los chips de géneros dinámicamente -->
-            </div>
+        <section>
+            <div id="genresBar" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1"></div>
         </section>
 
         <!-- 3. Contenedor de Recomendaciones -->
@@ -108,6 +108,6 @@
         El baúl de fernando — Motor de recomendaciones inteligente.
     </footer>
 
-    <script src="app.js?v=3.0"></script>
+    <script src="app.js?v=3.1"></script>
 </body>
 </html>
