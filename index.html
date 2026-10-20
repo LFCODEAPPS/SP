@@ -21,88 +21,97 @@
 </head>
 <body class="bg-zinc-950 text-white font-sans antialiased min-h-screen flex flex-col justify-between">
 
-    <!-- Header -->
-    <header class="bg-zinc-900/90 backdrop-blur-md border-b border-zinc-800 sticky top-0 z-50 px-4 sm:px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center gap-2">
-            <h1 class="text-lg sm:text-2xl font-black tracking-wider text-red-600">EL BAÚL DE <span class="text-white">FERNANDO</span></h1>
+    <!-- Header con navegación principal limpia -->
+    <header class="bg-zinc-900/90 backdrop-blur-md border-b border-zinc-800 sticky top-0 z-50 px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row justify-between items-center gap-3">
+        <div class="flex items-center justify-between w-full sm:w-auto">
+            <h1 class="text-lg sm:text-xl font-black tracking-wider text-red-600">EL BAÚL DE <span class="text-white">FERNANDO</span></h1>
         </div>
 
-        <!-- Botón Hamburguesa -->
-        <div class="relative">
-            <button id="menuBtn" onclick="toggleMenu(event)" class="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 border border-zinc-700 w-11 h-11 rounded-xl flex items-center justify-center transition cursor-pointer" title="Menú">
-                <svg class="w-6 h-6 text-zinc-200 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
-                </svg>
+        <!-- Pestañas de navegación tipo app nativa -->
+        <nav class="flex items-center gap-1.5 bg-zinc-950 p-1 rounded-2xl border border-zinc-800 w-full sm:w-auto justify-center">
+            <button id="navFeed" onclick="switchView('feed')" class="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer bg-white text-zinc-950 shadow-md">
+                Recomendaciones
             </button>
-
-            <!-- Menú Desplegable -->
-            <div id="menuDropdown" onclick="event.stopPropagation()" class="hidden absolute right-0 mt-2 w-84 max-w-[92vw] bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-2xl z-50 space-y-5">
-                
-                <!-- Sección 1: Ya vistas / Referencias -->
-                <div class="space-y-3">
-                    <h2 class="text-sm font-bold text-zinc-100 flex items-center gap-2">🎬 Mis Favoritas (Ya vistas)</h2>
-                    <p class="text-[11px] text-zinc-400">Tus referencias para generar las recomendaciones.</p>
-                    
-                    <div class="relative">
-                        <input type="text" id="favSearchInput" autocomplete="off" placeholder="Buscar para agregar..." class="w-full bg-zinc-950 border border-zinc-700 px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-red-600 transition">
-                        <div id="favSuggestions" class="hidden absolute left-0 right-0 top-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl"></div>
-                    </div>
-
-                    <div id="myFavoritesList" class="space-y-2 max-h-40 overflow-y-auto pr-1">
-                        <p class="text-xs text-zinc-500 italic text-center py-2">No hay elementos registrados.</p>
-                    </div>
-                </div>
-
-                <hr class="border-zinc-800">
-
-                <!-- Sección 2: Lista "Por Ver / Pendientes" -->
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-sm font-bold text-zinc-100 flex items-center gap-2">📌 Por Ver (Pendientes)</h2>
-                        <span id="watchlistCount" class="text-[10px] bg-red-600/30 text-red-400 border border-red-500/40 px-2 py-0.5 rounded-full font-semibold">0</span>
-                    </div>
-                    <p class="text-[11px] text-zinc-400">Recomendaciones guardadas para comenzar a ver.</p>
-
-                    <div id="myWatchlist" class="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        <p class="text-xs text-zinc-500 italic text-center py-2">Aún no has guardado nada en tu lista.</p>
-                    </div>
-                </div>
-
-            </div>
-        </div>
+            <button id="navWatchlist" onclick="switchView('watchlist')" class="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer text-zinc-400 hover:text-white flex items-center justify-center gap-1.5">
+                <span>Por Ver</span>
+                <span id="badgeWatchlist" class="text-[10px] bg-red-600 text-white px-1.5 py-0.2 rounded-full font-bold">0</span>
+            </button>
+            <button id="navFavorites" onclick="switchView('favorites')" class="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer text-zinc-400 hover:text-white flex items-center justify-center gap-1.5">
+                <span>Favoritas</span>
+                <span id="badgeFavorites" class="text-[10px] bg-zinc-800 text-zinc-300 px-1.5 py-0.2 rounded-full font-bold">0</span>
+            </button>
+        </nav>
     </header>
 
     <!-- Contenido Principal -->
     <main class="container mx-auto px-4 sm:px-6 py-5 flex-grow space-y-5">
 
-        <!-- 1. Botones de filtro de tipo -->
-        <section class="flex items-center justify-center gap-2 max-w-sm mx-auto">
-            <button id="filterAll" onclick="setTypeFilter('all')" class="flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition active:scale-95 cursor-pointer bg-white text-zinc-950 border-white shadow-md">
-                Todo
-            </button>
-            <button id="filterTv" onclick="setTypeFilter('tv')" class="flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition active:scale-95 cursor-pointer bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700">
-                Series
-            </button>
-            <button id="filterMovie" onclick="setTypeFilter('movie')" class="flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition active:scale-95 cursor-pointer bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700">
-                Películas
-            </button>
-        </section>
+        <!-- =================== VISTA 1: RECOMENDACIONES (FEED) =================== -->
+        <div id="viewFeed" class="space-y-5">
+            <!-- Filtro de tipo: Todo / Series / Películas -->
+            <section class="flex items-center justify-center gap-2 max-w-sm mx-auto">
+                <button id="filterAll" onclick="setTypeFilter('all')" class="flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition active:scale-95 cursor-pointer bg-white text-zinc-950 border-white shadow-md">
+                    Todo
+                </button>
+                <button id="filterTv" onclick="setTypeFilter('tv')" class="flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition active:scale-95 cursor-pointer bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700">
+                    Series
+                </button>
+                <button id="filterMovie" onclick="setTypeFilter('movie')" class="flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition active:scale-95 cursor-pointer bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700">
+                    Películas
+                </button>
+            </section>
 
-        <!-- 2. Filtro Horizontal de Géneros -->
-        <section>
-            <div id="genresBar" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1"></div>
-        </section>
+            <!-- Filtro Horizontal de Géneros -->
+            <section>
+                <div id="genresBar" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1"></div>
+            </section>
 
-        <!-- 3. Contenedor de Recomendaciones -->
-        <section class="space-y-6">
+            <!-- Contenedor dinámico de recomendaciones agrupadas por género -->
+            <section class="space-y-6">
+                <div class="border-b border-zinc-800 pb-3">
+                    <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Recomendaciones para ti</h2>
+                </div>
+
+                <div id="recommendationsContainer" class="space-y-10">
+                    <p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4 text-xs sm:text-sm">Ve a la pestaña <strong>Favoritas</strong> para registrar lo que ya viste y generar tus sugerencias personalizadas.</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- =================== VISTA 2: CATÁLOGO "POR VER" (WATCHLIST) =================== -->
+        <div id="viewWatchlist" class="hidden space-y-6">
+            <div class="border-b border-zinc-800 pb-3 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Mi Catálogo Por Ver</h2>
+                    <p class="text-xs text-zinc-400 pl-3 mt-0.5">Títulos que guardaste para ver próximamente.</p>
+                </div>
+            </div>
+
+            <!-- Cuadrícula con carátulas de pendientes -->
+            <div id="watchlistGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <!-- Se inyectan las portadas por JS -->
+            </div>
+        </div>
+
+        <!-- =================== VISTA 3: MIS FAVORITAS / YA VISTAS =================== -->
+        <div id="viewFavorites" class="hidden space-y-6">
             <div class="border-b border-zinc-800 pb-3">
-                <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Recomendaciones</h2>
+                <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Mis Películas y Series Vistas</h2>
+                <p class="text-xs text-zinc-400 pl-3 mt-0.5">La base que utiliza el sistema para entender tus gustos.</p>
             </div>
 
-            <div id="recommendationsContainer" class="space-y-10">
-                <p class="text-center text-zinc-500 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4 text-xs sm:text-sm">Abre el menú hamburguesa <strong>(≡)</strong> arriba a la derecha y agrega tus películas o series favoritas para comenzar.</p>
+            <!-- Buscador para agregar nuevas referencias -->
+            <div class="max-w-xl mx-auto relative">
+                <input type="text" id="favSearchInput" autocomplete="off" placeholder="Escribe para buscar y agregar (ej. Breaking Bad, Interstellar)..." class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 rounded-2xl text-xs sm:text-sm focus:outline-none focus:border-red-600 transition shadow-lg">
+                <div id="favSuggestions" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-zinc-950 border border-zinc-800 rounded-2xl max-h-60 overflow-y-auto z-50 shadow-2xl"></div>
             </div>
-        </section>
+
+            <!-- Cuadrícula con carátulas de favoritas -->
+            <div id="favoritesGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <!-- Se inyectan las portadas por JS -->
+            </div>
+        </div>
+
     </main>
 
     <!-- Modal de Detalles y Mapa de Calor -->
@@ -115,9 +124,9 @@
 
     <!-- Footer -->
     <footer class="border-t border-zinc-900 bg-zinc-950 py-6 text-center text-xs text-zinc-500">
-        El baúl de fernando — Motor de recomendaciones inteligente.
+        El baúl de fernando — Catálogo y motor de recomendaciones personalizadas.
     </footer>
 
-    <script src="app.js?v=4.0"></script>
+    <script src="app.js?v=5.0"></script>
 </body>
 </html>
