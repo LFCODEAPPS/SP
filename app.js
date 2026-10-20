@@ -10,7 +10,6 @@ window.toggleMenu = function(e) {
     }
 };
 
-// Cerrar menú al hacer clic fuera
 document.addEventListener('click', (e) => {
     const menu = document.getElementById('menuDropdown');
     const btn = document.getElementById('menuBtn');
@@ -23,12 +22,16 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// CLAVE INTEGRADA DIRECTAMENTE EN EL CÓDIGO
+const API_KEY = '7d59a5a92c91b35391c39a6491fa05f9';
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_URL = 'https://image.tmdb.org/t/p/w500';
 
 const favSearchInput = document.getElementById('favSearchInput');
 const favSuggestions = document.getElementById('favSuggestions');
 const myFavoritesList = document.getElementById('myFavoritesList');
+const myWatchlist = document.getElementById('myWatchlist');
+const watchlistCount = document.getElementById('watchlistCount');
 const recommendationsContainer = document.getElementById('recommendationsContainer');
 const genresBar = document.getElementById('genresBar');
 
@@ -36,13 +39,12 @@ const detailModal = document.getElementById('detailModal');
 const closeModal = document.getElementById('closeModal');
 const modalBody = document.getElementById('modalBody');
 
-const apiKeyInput = document.getElementById('apiKeyInput');
-const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
-
 // Estado
-let API_KEY = localStorage.getItem('tmdb_api_key') || '';
 let rawFavorites = JSON.parse(localStorage.getItem('fernando_favorites')) || [];
 let myFavorites = rawFavorites.filter(item => item && typeof item === 'object' && item.id && item.type);
+
+let rawWatchlist = JSON.parse(localStorage.getItem('fernando_watchlist')) || [];
+let myWatchlistItems = rawWatchlist.filter(item => item && typeof item === 'object' && item.id && item.type);
 
 // Filtros activos
 let currentTypeFilter = 'all'; // 'all', 'tv', 'movie'
@@ -50,38 +52,20 @@ let currentGenreFilter = 'all';
 let allLoadedRecommendations = [];
 let genreMap = new Map();
 
-if (API_KEY) {
-    apiKeyInput.value = API_KEY;
-    renderFavorites();
-    if (myFavorites.length > 0) {
-        generateSmartRecommendations();
-    }
-} else {
-    recommendationsContainer.innerHTML = '<p class="text-center text-amber-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">Haz clic en el botón hamburguesa <strong>(≡)</strong> para ingresar tu TMDB API Key.</p>';
+// Iniciar app directamente
+renderFavorites();
+renderWatchlist();
+if (myFavorites.length > 0) {
+    generateSmartRecommendations();
 }
 
-saveApiKeyBtn.addEventListener('click', () => {
-    const key = apiKeyInput.value.trim();
-    if (key) {
-        localStorage.setItem('tmdb_api_key', key);
-        API_KEY = key;
-        const menu = document.getElementById('menuDropdown');
-        if (menu) menu.classList.add('hidden');
-        alert('¡API Key guardada con éxito!');
-        renderFavorites();
-        if (myFavorites.length > 0) generateSmartRecommendations();
-    } else {
-        alert('Introduce una clave válida.');
-    }
-});
-
-// BUSCADOR EN EL MENÚ
+// BUSCADOR EN EL MENÚ (FAVORITAS / VISTAS)
 let favSearchTimeout;
 favSearchInput.addEventListener('input', (e) => {
     clearTimeout(favSearchTimeout);
     const q = e.target.value.trim();
     
-    if (!q || !API_KEY) {
+    if (!q) {
         favSuggestions.classList.add('hidden');
         favSuggestions.innerHTML = '';
         return;
@@ -114,7 +98,7 @@ favSearchInput.addEventListener('input', (e) => {
     }, 250);
 });
 
-// AGREGAR AL INICIO (LIFO)
+// GESTIÓN DE FAVORITAS (YA VISTAS)
 window.addFavorite = function(id, type, title) {
     if (myFavorites.some(f => f.id === id && f.type === type)) {
         favSearchInput.value = '';
@@ -123,6 +107,10 @@ window.addFavorite = function(id, type, title) {
     }
     myFavorites.unshift({ id, type, title });
     localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
+    
+    // Si estaba en "Por ver", la removemos de ahí automáticamente
+    removeWatchlist(id, type, false);
+
     favSearchInput.value = '';
     favSuggestions.classList.add('hidden');
     renderFavorites();
@@ -158,7 +146,58 @@ function renderFavorites() {
     `).join('');
 }
 
-// CONTROL DE FILTRO: TODO (Blanco) / SERIES (Verde) / PELÍCULAS (Naranja)
+// GESTIÓN DE WATCHLIST ("POR VER / PENDIENTES")
+window.addToWatchlist = function(id, type, title, event) {
+    if (event) event.stopPropagation();
+    if (myWatchlistItems.some(w => w.id === id && w.type === type)) {
+        alert('Ya está en tu lista de "Por Ver"');
+        return;
+    }
+    myWatchlistItems.unshift({ id, type, title });
+    localStorage.setItem('fernando_watchlist', JSON.stringify(myWatchlistItems));
+    renderWatchlist();
+    renderFilteredFeed(); // actualiza estado visual en botones
+};
+
+window.removeWatchlist = function(id, type, shouldRender = true) {
+    myWatchlistItems = myWatchlistItems.filter(w => !(w.id === id && w.type === type));
+    localStorage.setItem('fernando_watchlist', JSON.stringify(myWatchlistItems));
+    if (shouldRender) {
+        renderWatchlist();
+        renderFilteredFeed();
+    }
+};
+
+window.markAsWatched = function(id, type, title) {
+    addFavorite(id, type, title);
+    removeWatchlist(id, type);
+};
+
+function renderWatchlist() {
+    if (watchlistCount) watchlistCount.textContent = myWatchlistItems.length;
+
+    if (myWatchlistItems.length === 0) {
+        myWatchlist.innerHTML = '<p class="text-xs text-zinc-500 italic text-center py-2">Aún no has guardado nada en tu lista.</p>';
+        return;
+    }
+
+    myWatchlist.innerHTML = myWatchlistItems.map(item => `
+        <div class="bg-zinc-950 border border-zinc-800 px-3 py-2 rounded-xl flex justify-between items-center text-xs group hover:border-zinc-700 transition">
+            <div class="flex flex-col min-w-0 pr-2">
+                <span class="truncate font-medium text-zinc-200" title="${item.title}">${item.title}</span>
+                <span class="text-[9px] ${item.type === 'tv' ? 'text-emerald-400' : 'text-amber-500'} uppercase font-semibold">${item.type === 'tv' ? 'Serie' : 'Película'}</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <button type="button" onclick="markAsWatched(${item.id}, '${item.type}', '${item.title.replace(/'/g, "\\'")}')" class="bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-lg transition" title="Marcar como ya vista">
+                    ✔ Ya la vi
+                </button>
+                <button type="button" onclick="removeWatchlist(${item.id}, '${item.type}')" class="text-zinc-500 hover:text-red-500 font-bold text-base px-1.5 transition" title="Quitar">&times;</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// CONTROL DE FILTRO: TODO / SERIES / PELÍCULAS
 window.setTypeFilter = function(type) {
     currentTypeFilter = type;
     currentGenreFilter = 'all';
@@ -186,14 +225,12 @@ window.setTypeFilter = function(type) {
     renderFilteredFeed();
 };
 
-// CONTROL DE FILTRO DE GÉNERO
 window.setGenreFilter = function(genreName) {
     currentGenreFilter = genreName;
     updateGenresBar();
     renderFilteredFeed();
 };
 
-// ACTUALIZAR BARRA DE GÉNEROS
 function updateGenresBar() {
     let availableItems = allLoadedRecommendations.filter(item => {
         if (currentTypeFilter === 'all') return true;
@@ -228,9 +265,9 @@ function updateGenresBar() {
     genresBar.innerHTML = html;
 }
 
-// OBTENER RECOMENDACIONES CON FILTRO ANTI-SAGA Y BALANCE EQUITATIVO
+// OBTENER RECOMENDACIONES DE TMDB
 async function generateSmartRecommendations() {
-    if (myFavorites.length === 0 || !API_KEY) return;
+    if (myFavorites.length === 0) return;
     recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900">Analizando tus gustos con balance equitativo...</p>';
 
     try {
@@ -299,7 +336,7 @@ async function generateSmartRecommendations() {
     }
 }
 
-// RENDERIZAR FEED CON FILTROS APLICADOS
+// RENDERIZAR FEED CON FILTROS
 function renderFilteredFeed() {
     let filtered = allLoadedRecommendations;
 
@@ -350,7 +387,7 @@ function renderFilteredFeed() {
     }
 }
 
-// RENDERIZAR TARJETAS EN FEED
+// RENDERIZAR TARJETAS EN FEED (CON BOTÓN "+ Por ver")
 function displayMediaCards(items, container) {
     container.innerHTML = '';
     items.forEach(item => {
@@ -359,6 +396,9 @@ function displayMediaCards(items, container) {
         const date = release_date || first_air_date;
         const poster = poster_path ? `${IMG_URL}${poster_path}` : 'https://via.placeholder.com/500x750?text=Sin+Imagen';
         const realType = media_type || (title ? 'movie' : 'tv');
+
+        const isSaved = myWatchlistItems.some(w => w.id === id && w.type === realType);
+        const safeTitle = mediaTitle.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
         const typeBadge = realType === 'tv' 
             ? '<span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-1.5 py-0.5 rounded">Serie</span>' 
@@ -370,6 +410,12 @@ function displayMediaCards(items, container) {
             <div class="relative overflow-hidden aspect-[2/3]">
                 <img src="${poster}" alt="${mediaTitle}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
                 <span class="absolute top-2 right-2 bg-black/70 backdrop-blur-md text-xs font-bold px-2 py-1 rounded text-amber-400">⭐ ${vote_average ? vote_average.toFixed(1) : 'N/A'}</span>
+                
+                <!-- Botón directo "+ Por ver" en la portada -->
+                <button type="button" onclick="${isSaved ? `removeWatchlist(${id}, '${realType}', true)` : `addToWatchlist(${id}, '${realType}', '${safeTitle}', event)`}" 
+                    class="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-1 rounded-lg backdrop-blur-md border transition ${isSaved ? 'bg-red-600 text-white border-red-500' : 'bg-black/70 text-zinc-300 border-zinc-700 hover:border-white'}">
+                    ${isSaved ? '✓ En lista' : '+ Por ver'}
+                </button>
             </div>
             <div class="p-3 flex flex-col flex-grow justify-between gap-1.5">
                 <div class="flex items-center gap-1.5 overflow-hidden">
@@ -379,7 +425,10 @@ function displayMediaCards(items, container) {
                 <p class="text-[11px] text-zinc-500">${date ? date.split('-')[0] : ''}</p>
             </div>
         `;
-        card.addEventListener('click', () => fetchMediaDetails(id, realType));
+        card.addEventListener('click', (e) => {
+            if (e.target.tagName.toLowerCase() === 'button') return;
+            fetchMediaDetails(id, realType);
+        });
         container.appendChild(card);
     });
 }
@@ -434,6 +483,8 @@ function showMovieModal(movie, providers) {
 
     const trailerSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' trailer espanol latino')}`;
     const reviewSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' critica reseña')}`;
+    const isSaved = myWatchlistItems.some(w => w.id === movie.id && w.type === 'movie');
+    const safeTitle = movie.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     modalBody.innerHTML = `
         <div class="relative h-56 sm:h-72 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-4 bg-cover bg-center flex items-end p-4 sm:p-6" style="background-image: url('${backdrop}');">
@@ -445,12 +496,19 @@ function showMovieModal(movie, providers) {
         </div>
 
         <div class="space-y-5 text-sm text-zinc-300">
-            <div class="flex items-center gap-3 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
-                <span class="text-xl">⭐</span>
-                <div>
-                    <div class="text-sm font-bold text-white">${rating} / 10 <span class="text-xs font-normal text-zinc-400">calificación del público</span></div>
-                    <div class="text-[11px] text-zinc-500">${voteCount} votos registrados</div>
+            <!-- Calificación y Botón para Agregar a "Por Ver" -->
+            <div class="flex items-center justify-between gap-3 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
+                <div class="flex items-center gap-3">
+                    <span class="text-xl">⭐</span>
+                    <div>
+                        <div class="text-sm font-bold text-white">${rating} / 10 <span class="text-xs font-normal text-zinc-400">público</span></div>
+                        <div class="text-[11px] text-zinc-500">${voteCount} votos</div>
+                    </div>
                 </div>
+                <button type="button" onclick="${isSaved ? `removeWatchlist(${movie.id}, 'movie', true)` : `addToWatchlist(${movie.id}, 'movie', '${safeTitle}')`}; showMovieModal(${JSON.stringify(movie).replace(/"/g, '&quot;')}, ${JSON.stringify(providers).replace(/"/g, '&quot;')});" 
+                    class="px-3 py-2 rounded-xl text-xs font-bold transition border ${isSaved ? 'bg-red-600 text-white border-red-500' : 'bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700'}">
+                    ${isSaved ? '✓ En tu lista Por Ver' : '+ Agregar a Por Ver'}
+                </button>
             </div>
 
             <div class="space-y-2">
@@ -490,6 +548,8 @@ async function showTvModal(tv, providers) {
     let seasonsHtml = tv.seasons.filter(s => s.season_number > 0).map(s => `<option value="${s.season_number}">Temporada ${s.season_number} (${s.episode_count} eps)</option>`).join('');
 
     const reviewSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(tv.name + ' critica serie resena')}`;
+    const isSaved = myWatchlistItems.some(w => w.id === tv.id && w.type === 'tv');
+    const safeTitle = tv.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     modalBody.innerHTML = `
         <div class="relative h-56 sm:h-72 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-4 bg-cover bg-center flex items-end p-4 sm:p-6" style="background-image: url('${backdrop}');">
@@ -501,12 +561,19 @@ async function showTvModal(tv, providers) {
         </div>
 
         <div class="space-y-5 text-sm text-zinc-300">
-            <div class="flex items-center gap-3 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
-                <span class="text-xl">⭐</span>
-                <div>
-                    <div class="text-sm font-bold text-white">${rating} / 10 <span class="text-xs font-normal text-zinc-400">calificación del público</span></div>
-                    <div class="text-[11px] text-zinc-500">${voteCount} votos registrados</div>
+            <!-- Calificación y Botón para Agregar a "Por Ver" -->
+            <div class="flex items-center justify-between gap-3 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
+                <div class="flex items-center gap-3">
+                    <span class="text-xl">⭐</span>
+                    <div>
+                        <div class="text-sm font-bold text-white">${rating} / 10 <span class="text-xs font-normal text-zinc-400">público</span></div>
+                        <div class="text-[11px] text-zinc-500">${voteCount} votos</div>
+                    </div>
                 </div>
+                <button type="button" onclick="${isSaved ? `removeWatchlist(${tv.id}, 'tv', true)` : `addToWatchlist(${tv.id}, 'tv', '${safeTitle}')`}; showTvModal(${JSON.stringify(tv).replace(/"/g, '&quot;')}, ${JSON.stringify(providers).replace(/"/g, '&quot;')});" 
+                    class="px-3 py-2 rounded-xl text-xs font-bold transition border ${isSaved ? 'bg-red-600 text-white border-red-500' : 'bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700'}">
+                    ${isSaved ? '✓ En tu lista Por Ver' : '+ Agregar a Por Ver'}
+                </button>
             </div>
 
             <div class="space-y-2">
