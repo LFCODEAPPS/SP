@@ -17,13 +17,13 @@
 
         <!-- Buscador -->
         <div class="w-full md:w-96">
-            <input type="text" id="searchInput" placeholder="Busca películas, series..." class="w-full bg-zinc-800 border border-zinc-700 px-4 py-2 rounded-lg text-sm focus:outline-none focus:border-red-600 transition">
+            <input type="text" id="searchInput" placeholder="Busca películas, series (ej. Breaking Bad)..." class="w-full bg-zinc-800 border border-zinc-700 px-4 py-2 rounded-lg text-sm focus:outline-none focus:border-red-600 transition">
         </div>
 
-        <!-- Botón de Configuración de API Key -->
+        <!-- Botón de Configuración (Solo icono con funcionalidad de clic) -->
         <div class="relative">
-            <button id="configBtn" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition">
-                ⚙️ Configurar API Key
+            <button id="configBtn" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 w-10 h-10 rounded-lg text-base flex items-center justify-center transition cursor-pointer" title="Configurar API Key">
+                ⚙️
             </button>
             
             <!-- Menú desplegable oculto de configuración -->
@@ -45,7 +45,7 @@
         </section>
     </main>
 
-    <!-- Modal de Detalles, Trailer y Calificación por Episodios -->
+    <!-- Modal de Detalles, Trailer y Mapa de Calor -->
     <div id="detailModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
         <div class="bg-zinc-900 border border-zinc-800 w-full max-w-4xl rounded-xl overflow-hidden relative shadow-2xl flex flex-col max-h-[90vh]">
             <button id="closeModal" class="absolute top-4 right-4 text-zinc-400 hover:text-white text-2xl font-bold z-10 bg-zinc-950/60 w-8 h-8 rounded-full flex items-center justify-center">&times;</button>
@@ -55,7 +55,7 @@
 
     <!-- Footer -->
     <footer class="border-t border-zinc-900 bg-zinc-950 py-6 text-center text-xs text-zinc-500">
-        El baúl de fernando — Desarrollado con la API de TMDB.
+        El baúl de fernando
     </footer>
 
     <script src="app.js"></script>
