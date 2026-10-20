@@ -1,9 +1,26 @@
-// CLAVE DE TMDB INTEGRADA
+// --- CONFIGURACIÓN DE FIREBASE OFICIAL ---
+const firebaseConfig = {
+    apiKey: "AIzaSyC6uQzOIIt2vM54CR27G4hvJDWz_NKv61Y",
+    authDomain: "el-baul-de-fernando.firebaseapp.com",
+    projectId: "el-baul-de-fernando",
+    storageBucket: "el-baul-de-fernando.firebasestorage.app",
+    messagingSenderId: "648436947805",
+    appId: "1:648436947805:web:9d7e3f2e326c8b69f766b4",
+    measurementId: "G-7JYXDWNSHM"
+};
+
+// Inicializar Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+// TMDB API
 const API_KEY = '7d59a5a92c91b35391c39a6491fa05f9';
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_URL = 'https://image.tmdb.org/t/p/w500';
 
-// Elementos de Vistas
+// Elementos de la interfaz
 const viewFeed = document.getElementById('viewFeed');
 const viewWatchlist = document.getElementById('viewWatchlist');
 const viewFavorites = document.getElementById('viewFavorites');
@@ -15,33 +32,118 @@ const navFavorites = document.getElementById('navFavorites');
 const badgeWatchlist = document.getElementById('badgeWatchlist');
 const badgeFavorites = document.getElementById('badgeFavorites');
 
-// Contenedores
 const recommendationsContainer = document.getElementById('recommendationsContainer');
 const watchlistGrid = document.getElementById('watchlistGrid');
 const favoritesGrid = document.getElementById('favoritesGrid');
 const genresBar = document.getElementById('genresBar');
 
-// Buscador de favoritas
 const favSearchInput = document.getElementById('favSearchInput');
 const favSuggestions = document.getElementById('favSuggestions');
 
-// Modal
 const detailModal = document.getElementById('detailModal');
 const closeModal = document.getElementById('closeModal');
 const modalBody = document.getElementById('modalBody');
 
+const authContainerDesktop = document.getElementById('authContainerDesktop');
+const authContainerMobile = document.getElementById('authContainerMobile');
+
 // Estado
-let rawFavorites = JSON.parse(localStorage.getItem('fernando_favorites')) || [];
-let myFavorites = rawFavorites.filter(item => item && typeof item === 'object' && item.id && item.type);
+let currentUser = null;
+let myFavorites = JSON.parse(localStorage.getItem('fernando_favorites')) || [];
+let myWatchlistItems = JSON.parse(localStorage.getItem('fernando_watchlist')) || [];
 
-let rawWatchlist = JSON.parse(localStorage.getItem('fernando_watchlist')) || [];
-let myWatchlistItems = rawWatchlist.filter(item => item && typeof item === 'object' && item.id && item.type);
-
-// Filtros
-let currentTypeFilter = 'all'; // 'all', 'tv', 'movie'
+let currentTypeFilter = 'all';
 let currentGenreFilter = 'all';
 let allLoadedRecommendations = [];
 let genreMap = new Map();
+
+// --- AUTENTICACIÓN GOOGLE SIGN-IN ---
+auth.onAuthStateChanged(async (user) => {
+    currentUser = user;
+    renderAuthButtons();
+
+    if (user) {
+        await loadUserDataFromCloud(user.uid);
+    } else {
+        myFavorites = JSON.parse(localStorage.getItem('fernando_favorites')) || [];
+        myWatchlistItems = JSON.parse(localStorage.getItem('fernando_watchlist')) || [];
+    }
+
+    updateBadges();
+    if (myFavorites.length > 0) {
+        generateSmartRecommendations();
+    }
+});
+
+function renderAuthButtons() {
+    const authHtml = currentUser ? `
+        <div class="flex items-center gap-2">
+            <img src="${currentUser.photoURL || 'https://via.placeholder.com/32'}" alt="${currentUser.displayName}" class="w-7 h-7 rounded-full border border-zinc-700 object-cover">
+            <span class="text-xs font-semibold text-zinc-300 hidden md:inline truncate max-w-[100px]">${currentUser.displayName.split(' ')[0]}</span>
+            <button onclick="logoutGoogle()" class="text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white px-2.5 py-1 rounded-xl transition border border-zinc-700">Salir</button>
+        </div>
+    ` : `
+        <button onclick="loginGoogle()" class="flex items-center gap-2 bg-white hover:bg-zinc-100 text-zinc-950 font-bold text-xs px-3 py-1.5 rounded-xl transition shadow active:scale-95">
+            <svg class="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Acceder</span>
+        </button>
+    `;
+
+    if (authContainerDesktop) authContainerDesktop.innerHTML = authHtml;
+    if (authContainerMobile) authContainerMobile.innerHTML = authHtml;
+}
+
+window.loginGoogle = async function() {
+    try {
+        await auth.signInWithPopup(googleProvider);
+    } catch (e) {
+        console.error("Error iniciando sesión con Google:", e);
+    }
+};
+
+window.logoutGoogle = async function() {
+    try {
+        await auth.signOut();
+    } catch (e) {
+        console.error("Error al salir:", e);
+    }
+};
+
+// SINCRONIZACIÓN CON FIRESTORE
+async function loadUserDataFromCloud(uid) {
+    try {
+        const doc = await db.collection('users').doc(uid).get();
+        if (doc.exists) {
+            const data = doc.data();
+            myFavorites = data.favorites || [];
+            myWatchlistItems = data.watchlist || [];
+            localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
+            localStorage.setItem('fernando_watchlist', JSON.stringify(myWatchlistItems));
+        } else {
+            await syncToCloud();
+        }
+    } catch (err) {
+        console.error("Error cargando datos de Firestore:", err);
+    }
+}
+
+async function syncToCloud() {
+    if (!currentUser) return;
+    try {
+        await db.collection('users').doc(currentUser.uid).set({
+            favorites: myFavorites,
+            watchlist: myWatchlistItems,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    } catch (err) {
+        console.error("Error guardando en Firestore:", err);
+    }
+}
 
 // --- NAVEGACIÓN ENTRE VISTAS ---
 window.switchView = function(viewName) {
@@ -67,24 +169,10 @@ window.switchView = function(viewName) {
     }
 };
 
-// Actualizar contadores numéricos
 function updateBadges() {
     if (badgeWatchlist) badgeWatchlist.textContent = myWatchlistItems.length;
     if (badgeFavorites) badgeFavorites.textContent = myFavorites.length;
 }
-
-// Iniciar aplicación
-updateBadges();
-if (myFavorites.length > 0) {
-    generateSmartRecommendations();
-}
-
-// Cerrar sugerencias al hacer clic fuera
-document.addEventListener('click', (e) => {
-    if (favSearchInput && favSuggestions && !favSearchInput.contains(e.target) && !favSuggestions.contains(e.target)) {
-        favSuggestions.classList.add('hidden');
-    }
-});
 
 // BUSCADOR EN VISTA FAVORITAS
 let favSearchTimeout;
@@ -134,6 +222,12 @@ favSearchInput.addEventListener('input', (e) => {
     }, 250);
 });
 
+document.addEventListener('click', (e) => {
+    if (favSearchInput && favSuggestions && !favSearchInput.contains(e.target) && !favSuggestions.contains(e.target)) {
+        favSuggestions.classList.add('hidden');
+    }
+});
+
 // GESTIÓN DE FAVORITAS (YA VISTAS)
 window.addFavorite = function(id, type, title, poster_path = '', release_date = '') {
     if (myFavorites.some(f => f.id === id && f.type === type)) {
@@ -143,8 +237,8 @@ window.addFavorite = function(id, type, title, poster_path = '', release_date = 
     }
     myFavorites.unshift({ id, type, title, poster_path, release_date });
     localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
+    syncToCloud();
 
-    // Si estaba en Por Ver, se remueve
     removeWatchlist(id, type, false);
 
     favSearchInput.value = '';
@@ -157,6 +251,8 @@ window.addFavorite = function(id, type, title, poster_path = '', release_date = 
 window.removeFavorite = function(id, type) {
     myFavorites = myFavorites.filter(f => !(f.id === id && f.type === type));
     localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
+    syncToCloud();
+
     updateBadges();
     renderFavoritesCatalog();
     if (myFavorites.length > 0) {
@@ -168,7 +264,6 @@ window.removeFavorite = function(id, type) {
     }
 };
 
-// RENDERIZAR CATÁLOGO DE FAVORITAS (PANTALLA COMPLETA CON CARÁTULAS)
 function renderFavoritesCatalog() {
     if (myFavorites.length === 0) {
         favoritesGrid.innerHTML = `
@@ -217,6 +312,8 @@ window.addToWatchlist = function(id, type, title, poster_path = '', release_date
 
     myWatchlistItems.unshift({ id, type, title, poster_path, release_date });
     localStorage.setItem('fernando_watchlist', JSON.stringify(myWatchlistItems));
+    syncToCloud();
+
     updateBadges();
     renderFilteredFeed();
     if (!viewWatchlist.classList.contains('hidden')) {
@@ -227,6 +324,8 @@ window.addToWatchlist = function(id, type, title, poster_path = '', release_date
 window.removeWatchlist = function(id, type, shouldRender = true) {
     myWatchlistItems = myWatchlistItems.filter(w => !(w.id === id && w.type === type));
     localStorage.setItem('fernando_watchlist', JSON.stringify(myWatchlistItems));
+    syncToCloud();
+
     updateBadges();
     if (shouldRender) {
         renderFilteredFeed();
@@ -240,7 +339,6 @@ window.markAsWatched = function(id, type, title, poster_path, release_date, even
     removeWatchlist(id, type);
 };
 
-// RENDERIZAR CATÁLOGO "POR VER" (PANTALLA COMPLETA CON CARÁTULAS)
 function renderWatchlistCatalog() {
     if (myWatchlistItems.length === 0) {
         watchlistGrid.innerHTML = `
@@ -282,7 +380,6 @@ function renderWatchlistCatalog() {
                         <p class="text-[11px] text-zinc-500 mt-0.5">${item.release_date || ''}</p>
                     </div>
 
-                    <!-- Botón para marcar como vista directamente -->
                     <button type="button" onclick="markAsWatched(${item.id}, '${item.type}', '${safeTitle}', '${safePoster}', '${item.release_date || ''}', event)"
                         class="w-full bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-700/70 text-emerald-300 font-bold text-[11px] py-1.5 rounded-lg transition flex items-center justify-center gap-1 shadow">
                         <span>✔ Ya la vi</span>
@@ -293,7 +390,7 @@ function renderWatchlistCatalog() {
     }).join('');
 }
 
-// CONTROL DE FILTRO DE TIPO EN RECOMENDACIONES
+// FILTROS EN FEED
 window.setTypeFilter = function(type) {
     currentTypeFilter = type;
     currentGenreFilter = 'all';
@@ -432,7 +529,6 @@ async function generateSmartRecommendations() {
     }
 }
 
-// RENDERIZAR FEED CON FILTROS
 function renderFilteredFeed() {
     let filtered = allLoadedRecommendations;
 
@@ -483,7 +579,6 @@ function renderFilteredFeed() {
     }
 }
 
-// RENDERIZAR TARJETAS EN FEED (CON PORTADA Y BOTÓN DIRECTO "+ Por ver")
 function displayMediaCards(items, container) {
     container.innerHTML = '';
     items.forEach(item => {
@@ -571,7 +666,6 @@ function getProvidersHtml(providers) {
     `;
 }
 
-// MODAL PARA PELÍCULAS
 function showMovieModal(movie, providers) {
     const backdrop = movie.backdrop_path ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}` : '';
     const rating = movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A';
@@ -636,7 +730,6 @@ function showMovieModal(movie, providers) {
     detailModal.classList.remove('hidden');
 }
 
-// MODAL PARA SERIES
 async function showTvModal(tv, providers) {
     const backdrop = tv.backdrop_path ? `https://image.tmdb.org/t/p/original${tv.backdrop_path}` : '';
     const rating = tv.vote_average ? tv.vote_average.toFixed(1) : 'N/A';
