@@ -9,17 +9,11 @@
 <body class="bg-zinc-950 text-white font-sans antialiased min-h-screen flex flex-col justify-between">
 
     <!-- Header -->
-    <header class="bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 sticky top-0 z-50 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+    <header class="bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 sticky top-0 z-50 px-6 py-4 flex justify-between items-center">
         <div class="flex items-center gap-3">
             <h1 class="text-xl md:text-2xl font-black tracking-wider text-red-600">EL BAÚL DE <span class="text-white">FERNANDO</span></h1>
             <span class="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded font-semibold uppercase">Smart Recommender</span>
         </div>
-
-        <!-- Pestañas de Navegación -->
-        <nav class="flex items-center gap-2 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
-            <button id="tabCatalog" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white transition cursor-pointer">Catálogo</button>
-            <button id="tabRecommendations" class="px-4 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition cursor-pointer">Mis Recomendaciones 🧠</button>
-        </nav>
 
         <!-- Configuración API Key -->
         <div class="relative">
@@ -34,43 +28,42 @@
         </div>
     </header>
 
-    <!-- Contenido Principal -->
+    <!-- Contenido Principal: Estructura a dos columnas -->
     <main class="container mx-auto px-6 py-8 flex-grow">
-        
-        <!-- VISTA 1: CATÁLOGO Y BÚSQUEDA -->
-        <div id="viewCatalog" class="space-y-6">
-            <div class="w-full max-w-xl mx-auto">
-                <input type="text" id="searchInput" placeholder="Busca películas, series (ej. Breaking Bad, Interstellar)..." class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-red-600 transition shadow-lg">
-            </div>
-            <section>
-                <h2 id="sectionTitle" class="text-xl font-bold mb-6 text-zinc-200 border-l-4 border-red-600 pl-3">Tendencias Populares</h2>
-                <div id="moviesGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
-            </section>
-        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+            
+            <!-- COLUMNA IZQUIERDA: Sidebar Profesional de Favoritas / Vistas -->
+            <aside class="lg:col-span-1 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-xl space-y-5 sticky top-24">
+                <div>
+                    <h2 class="text-base font-bold text-zinc-100 flex items-center gap-2">🎬 Mis Favoritas</h2>
+                    <p class="text-[11px] text-zinc-400 mt-1">Agrega lo que ya viste para generar recomendaciones a la derecha.</p>
+                </div>
 
-        <!-- VISTA 2: MIS FAVORITOS Y RECOMENDACIONES -->
-        <div id="viewRecommendations" class="hidden space-y-8">
-            <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl shadow-xl space-y-4">
-                <h2 class="text-lg font-bold text-zinc-100 flex items-center gap-2">🎬 Tus Favoritas / Películas que ya viste</h2>
-                <p class="text-xs text-zinc-400">Escribe aquí abajo las películas o series que te hayan gustado. El sistema usará tus gustos para recomendarte contenido similar dividido por géneros.</p>
-                
+                <!-- Buscador para agregar -->
                 <div class="relative">
-                    <input type="text" id="favSearchInput" placeholder="Ej. Breaking Bad, Interestelar, Matrix..." class="w-full bg-zinc-950 border border-zinc-700 px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-red-600">
+                    <input type="text" id="favSearchInput" placeholder="Buscar película o serie..." class="w-full bg-zinc-950 border border-zinc-700 px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-red-600 transition">
                     <div id="favSuggestions" class="hidden absolute top-full left-0 right-0 mt-1 bg-zinc-950 border border-zinc-800 rounded-xl max-h-60 overflow-y-auto z-50 shadow-2xl"></div>
                 </div>
 
-                <!-- Lista de favoritos guardados -->
-                <div id="myFavoritesList" class="flex flex-wrap gap-2 pt-2">
-                    <p class="text-xs text-zinc-500 italic">No tienes favoritas registradas aún.</p>
+                <!-- Lista vertical profesional -->
+                <div id="myFavoritesList" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                    <p class="text-xs text-zinc-500 italic text-center py-4">No hay elementos registrados.</p>
                 </div>
-            </div>
+            </aside>
 
-            <!-- Contenedor de Recomendaciones por Género -->
-            <div id="recommendationsContainer" class="space-y-10">
-                <p class="text-center text-zinc-500 py-10">Agrega al menos una película o serie favorita arriba para generar recomendaciones personalizadas.</p>
-            </div>
+            <!-- COLUMNA DERECHA: Recomendaciones Divididas por Géneros -->
+            <section class="lg:col-span-3 space-y-8">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Recomendaciones Personalizadas por Género</h2>
+                    <p class="text-xs text-zinc-400 mt-1 pl-3">Basadas en tu lista de favoritas de la izquierda.</p>
+                </div>
+
+                <div id="recommendationsContainer" class="space-y-10">
+                    <p class="text-center text-zinc-500 py-16 bg-zinc-900/30 rounded-2xl border border-zinc-900">Agrega al menos una película o serie en la barra lateral izquierda para comenzar.</p>
+                </div>
+            </section>
+
         </div>
-
     </main>
 
     <!-- Modal de Detalles, Trailer y Episodios -->
