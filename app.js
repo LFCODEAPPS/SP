@@ -20,12 +20,20 @@ if (API_KEY) {
     apiKeyInput.value = API_KEY;
     fetchTrendingMedia();
 } else {
-    moviesGrid.innerHTML = '<p class="text-amber-400 col-span-full text-center py-10">Haz clic en <strong>⚙️ Configurar API Key</strong> en la esquina superior derecha para empezar.</p>';
+    moviesGrid.innerHTML = '<p class="text-amber-400 col-span-full text-center py-10">Haz clic en el icono de configuración <strong>⚙️</strong> en la esquina superior derecha para ingresar tu API Key.</p>';
 }
 
-// Mostrar / Ocultar menú desplegable de configuración
-configBtn.addEventListener('click', () => {
+// Abrir / Cerrar menú desplegable de configuración con el botón de la rueda
+configBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     configMenu.classList.toggle('hidden');
+});
+
+// Cerrar el menú si se hace clic fuera de él
+document.addEventListener('click', (e) => {
+    if (!configMenu.contains(e.target) && !configBtn.contains(e.target)) {
+        configMenu.classList.add('hidden');
+    }
 });
 
 // Guardar API Key
@@ -42,7 +50,7 @@ saveApiKeyBtn.addEventListener('click', () => {
     }
 });
 
-// Cargar tendencias (mezcla películas y series)
+// Cargar tendencias
 async function fetchTrendingMedia() {
     if (!API_KEY) return;
     try {
@@ -75,7 +83,6 @@ async function searchMedia(query) {
     try {
         const response = await fetch(`${BASE_URL}/search/multi?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(query)}`);
         const data = await response.json();
-        // Filtramos solo películas y series (evitamos personas)
         const filteredResults = data.results.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
         displayMedia(filteredResults);
     } catch (error) {
@@ -83,7 +90,7 @@ async function searchMedia(query) {
     }
 }
 
-// Renderizar tarjetas en la cuadrícula
+// Renderizar tarjetas
 function displayMedia(items) {
     moviesGrid.innerHTML = '';
 
@@ -97,7 +104,10 @@ function displayMedia(items) {
         const mediaTitle = title || name;
         const date = release_date || first_air_date;
         const poster = poster_path ? `${IMG_URL}${poster_path}` : 'https://via.placeholder.com/500x750?text=Sin+Imagen';
-        const typeLabel = media_type === 'tv' ? 'Serie' : 'Película';
+        
+        // Forzamos la detección correcta del tipo de medio si viene de multi-search
+        const realMediaType = media_type || (title ? 'movie' : 'tv');
+        const typeLabel = realMediaType === 'tv' ? 'Serie' : 'Película';
 
         const card = document.createElement('div');
         card.className = 'bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 hover:border-red-600 transition cursor-pointer flex flex-col group';
@@ -114,19 +124,26 @@ function displayMedia(items) {
             </div>
         `;
 
-        card.addEventListener('click', () => fetchMediaDetails(id, media_type || (item.title ? 'movie' : 'tv')));
+        card.addEventListener('click', () => fetchMediaDetails(id, realMediaType));
         moviesGrid.appendChild(card);
     });
 }
 
-// Obtener detalles (Película o Serie)
+// Obtener detalles garantizando el tipo correcto
 async function fetchMediaDetails(id, type) {
     try {
-        const endpoint = type === 'tv' ? `${BASE_URL}/tv/${id}` : `${BASE_URL}/movie/${id}`;
-        const res = await fetch(`${endpoint}?api_key=${API_KEY}&language=es-ES`);
-        const data = await res.json();
+        let endpoint = `${BASE_URL}/${type}/${id}`;
+        let res = await fetch(`${endpoint}?api_key=${API_KEY}&language=es-ES`);
+        let data = await res.json();
 
-        const resVideos = await fetch(`${endpoint}/videos?api_key=${API_KEY}`);
+        // Si buscamos una serie pero TMDB devolvió un objeto de película por error, reintentamos como 'tv'
+        if (type === 'movie' && !data.runtime && data.number_of_seasons) {
+            type = 'tv';
+        } else if (type === 'tv' && data.runtime && !data.number_of_seasons) {
+            type = 'movie';
+        }
+
+        const resVideos = await fetch(`${BASE_URL}/${type}/${id}/videos?api_key=${API_KEY}`);
         const videoData = await resVideos.json();
         const trailer = videoData.results.find(vid => vid.type === 'Trailer' && vid.site === 'YouTube');
 
@@ -172,11 +189,10 @@ function showMovieModal(movie, trailerKey) {
     detailModal.classList.remove('hidden');
 }
 
-// Modal para Series con Mapa de Calor de Calificaciones por Episodios (Estilo la foto)
+// Modal para Series con Mapa de Calor por Episodios
 async function showTvModal(tv, trailerKey) {
     const backdrop = tv.backdrop_path ? `https://image.tmdb.org/t/p/original${tv.backdrop_path}` : '';
     
-    // Generamos las opciones de las temporadas
     let seasonsHtml = tv.seasons
         .filter(s => s.season_number > 0)
         .map(s => `<option value="${s.season_number}">Temporada ${s.season_number} (${s.episode_count} episodios)</option>`)
@@ -230,16 +246,14 @@ async function showTvModal(tv, trailerKey) {
 
     detailModal.classList.remove('hidden');
 
-    // Cargar temporada 1 por defecto
     loadSeasonEpisodes(tv.id, 1);
 
-    // Evento al cambiar de temporada en el selector
     document.getElementById('seasonSelect').addEventListener('change', (e) => {
         loadSeasonEpisodes(tv.id, e.target.value);
     });
 }
 
-// Función para cargar los episodios de una temporada y pintar el mapa de calor
+// Cargar episodios de la temporada
 async function loadSeasonEpisodes(tvId, seasonNumber) {
     const heatmapContainer = document.getElementById('episodesHeatmap');
     heatmapContainer.innerHTML = '<p class="text-xs text-zinc-500 col-span-full text-center py-4">Cargando episodios...</p>';
@@ -249,7 +263,7 @@ async function loadSeasonEpisodes(tvId, seasonNumber) {
         const seasonData = await res.json();
 
         if (!seasonData.episodes || seasonData.episodes.length === 0) {
-            heatmapContainer.innerHTML = '<p class="text-xs text-zinc-500 col-span-full text-center py-4">No hay información de episodios para esta temporada.</p>';
+            heatmapContainer.innerHTML = '<p class="text-xs text-zinc-500 col-span-full text-center py-4">No hay información de episodios.</p>';
             return;
         }
 
@@ -260,7 +274,6 @@ async function loadSeasonEpisodes(tvId, seasonNumber) {
             const voteCount = ep.vote_count;
             const ratingText = rating > 0 ? rating.toFixed(1) : 'N/A';
 
-            // Asignación de colores según la calificación (estilo mapa de calor de la foto)
             let bgColor = 'bg-zinc-800 text-zinc-400';
             if (rating >= 8.5) {
                 bgColor = 'bg-emerald-600 text-white font-bold';
@@ -279,7 +292,7 @@ async function loadSeasonEpisodes(tvId, seasonNumber) {
             epCard.title = `${ep.episode_number}. ${ep.name} - ${ratingText} (${voteCount} votos)`;
 
             epCard.innerHTML = `
-                <div class="flex justify-between items-center text-[11px] opacity-80">
+                <div class="flex justify-between items-center text-[11px] opacity-90">
                     <span>E${ep.episode_number}</span>
                     <span>⭐ ${ratingText}</span>
                 </div>
