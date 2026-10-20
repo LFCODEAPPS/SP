@@ -53,15 +53,18 @@ saveApiKeyBtn.addEventListener('click', () => {
     }
 });
 
-// BUSCADOR PARA AGREGAR A LA LISTA LATERAL
+// 1. AUTOCOMPLETADO DINÁMICO AL ESCRIBIR
 let favSearchTimeout;
 favSearchInput.addEventListener('input', (e) => {
     clearTimeout(favSearchTimeout);
     const q = e.target.value.trim();
+    
     if (!q || !API_KEY) {
         favSuggestions.classList.add('hidden');
+        favSuggestions.innerHTML = '';
         return;
     }
+
     favSearchTimeout = setTimeout(async () => {
         try {
             const res = await fetch(`${BASE_URL}/search/multi?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(q)}`);
@@ -76,8 +79,8 @@ favSearchInput.addEventListener('input', (e) => {
                     const type = item.media_type;
                     const year = (item.release_date || item.first_air_date || '').split('-')[0];
                     const safeTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    return `<div class="p-2.5 hover:bg-zinc-900 cursor-pointer text-xs flex justify-between items-center border-b border-zinc-900" onclick="addFavorite(${item.id}, '${type}', '${safeTitle}')">
-                        <span class="truncate pr-2"><strong>${title}</strong> (${year || 'N/A'})</span>
+                    return `<div class="p-3 hover:bg-zinc-900 cursor-pointer text-xs flex justify-between items-center border-b border-zinc-900/50 transition" onclick="addFavorite(${item.id}, '${type}', '${safeTitle}')">
+                        <span class="truncate pr-2 text-zinc-200"><strong>${title}</strong> (${year || 'N/A'})</span>
                         <span class="text-red-500 font-bold whitespace-nowrap">+ Agregar</span>
                     </div>`;
                 }).join('');
@@ -86,17 +89,23 @@ favSearchInput.addEventListener('input', (e) => {
         } catch (err) {
             console.error("Error buscando:", err);
         }
-    }, 300);
+    }, 250);
 });
 
+// Cerrar sugerencias si se hace clic fuera
 document.addEventListener('click', (e) => {
     if (!favSearchInput.contains(e.target) && !favSuggestions.contains(e.target)) {
         favSuggestions.classList.add('hidden');
     }
 });
 
+// Agregar a favoritos
 window.addFavorite = function(id, type, title) {
-    if (myFavorites.some(f => f.id === id && f.type === type)) return;
+    if (myFavorites.some(f => f.id === id && f.type === type)) {
+        favSearchInput.value = '';
+        favSuggestions.classList.add('hidden');
+        return;
+    }
     myFavorites.push({ id, type, title });
     localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
     favSearchInput.value = '';
@@ -105,6 +114,7 @@ window.addFavorite = function(id, type, title) {
     generateSmartRecommendations();
 };
 
+// Eliminar de favoritos (Asegurando ejecución directa)
 window.removeFavorite = function(id, type) {
     myFavorites = myFavorites.filter(f => !(f.id === id && f.type === type));
     localStorage.setItem('fernando_favorites', JSON.stringify(myFavorites));
@@ -116,7 +126,7 @@ window.removeFavorite = function(id, type) {
     }
 };
 
-// RENDERIZAR LISTA LATERAL PROFESIONAL CON BOTÓN FUNCIONAL
+// RENDERIZAR LISTA LATERAL CON EVENTO ONCLICK DIRECTO
 function renderFavorites() {
     if (myFavorites.length === 0) {
         myFavoritesList.innerHTML = '<p class="text-xs text-zinc-500 italic text-center py-4">No hay elementos registrados.</p>';
@@ -133,7 +143,7 @@ function renderFavorites() {
     `).join('');
 }
 
-// GENERAR RECOMENDACIONES POR GÉNERO
+// 2. GENERAR RECOMENDACIONES POR GÉNERO
 async function generateSmartRecommendations() {
     if (myFavorites.length === 0 || !API_KEY) return;
     recommendationsContainer.innerHTML = '<p class="text-center text-zinc-400 py-16 bg-zinc-900/30 rounded-2xl border border-zinc-900">Analizando tus gustos y buscando recomendaciones por género...</p>';
@@ -226,7 +236,7 @@ function displayMediaCards(items, container) {
     });
 }
 
-// DETALLES Y MAPA DE CALOR
+// 3. DETALLES Y MAPA DE CALOR
 async function fetchMediaDetails(id, type) {
     try {
         let endpoint = `${BASE_URL}/${type}/${id}`;
