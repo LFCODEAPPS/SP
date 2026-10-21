@@ -15,7 +15,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Firebase SDKs (Compat v10 para integración directa sin build tools) -->
+    <!-- Firebase SDKs (Compat v10) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -37,7 +37,7 @@
             <div id="authContainerMobile" class="sm:hidden flex items-center"></div>
         </div>
 
-        <!-- Pestañas de navegación tipo app nativa -->
+        <!-- Pestañas de navegación -->
         <nav class="flex items-center gap-1.5 bg-zinc-950 p-1 rounded-2xl border border-zinc-800 w-full sm:w-auto justify-center">
             <button id="navFeed" onclick="switchView('feed')" class="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer bg-white text-zinc-950 shadow-md">
                 Recomendaciones
@@ -61,7 +61,6 @@
 
         <!-- =================== VISTA 1: RECOMENDACIONES (FEED) =================== -->
         <div id="viewFeed" class="space-y-5">
-            <!-- Filtro de tipo: Todo / Series / Películas -->
             <section class="flex items-center justify-center gap-2 max-w-sm mx-auto">
                 <button id="filterAll" onclick="setTypeFilter('all')" class="flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition active:scale-95 cursor-pointer bg-white text-zinc-950 border-white shadow-md">
                     Todo
@@ -74,12 +73,10 @@
                 </button>
             </section>
 
-            <!-- Filtro Horizontal de Géneros -->
             <section>
                 <div id="genresBar" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1"></div>
             </section>
 
-            <!-- Contenedor dinámico de recomendaciones agrupadas por género -->
             <section class="space-y-6">
                 <div class="border-b border-zinc-800 pb-3">
                     <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Recomendaciones para ti</h2>
@@ -93,13 +90,18 @@
 
         <!-- =================== VISTA 2: CATÁLOGO "POR VER" (WATCHLIST) =================== -->
         <div id="viewWatchlist" class="hidden space-y-6">
-            <div class="border-b border-zinc-800 pb-3 flex items-center justify-between">
-                <div>
-                    <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Mi Catálogo Por Ver</h2>
-                    <p class="text-xs text-zinc-400 pl-3 mt-0.5">Títulos sincronizados en tu cuenta de Google.</p>
-                </div>
+            <div class="border-b border-zinc-800 pb-3">
+                <h2 class="text-lg sm:text-xl font-bold text-zinc-100 border-l-4 border-red-600 pl-3">Mi Catálogo Por Ver</h2>
+                <p class="text-xs text-zinc-400 pl-3 mt-0.5">Títulos pendientes guardados o agregados manualmente.</p>
             </div>
 
+            <!-- Buscador Manual para Agregar a "Por Ver" -->
+            <div class="max-w-xl mx-auto relative">
+                <input type="text" id="watchlistSearchInput" autocomplete="off" placeholder="Buscar película o serie para agregar a pendientes..." class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 rounded-2xl text-xs sm:text-sm focus:outline-none focus:border-red-600 transition shadow-lg">
+                <div id="watchlistSuggestions" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-zinc-950 border border-zinc-800 rounded-2xl max-h-60 overflow-y-auto z-50 shadow-2xl"></div>
+            </div>
+
+            <!-- Cuadrícula con carátulas -->
             <div id="watchlistGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
         </div>
 
@@ -110,11 +112,13 @@
                 <p class="text-xs text-zinc-400 pl-3 mt-0.5">La base para tus recomendaciones en la nube.</p>
             </div>
 
+            <!-- Buscador de Favoritas -->
             <div class="max-w-xl mx-auto relative">
                 <input type="text" id="favSearchInput" autocomplete="off" placeholder="Escribe para buscar y agregar (ej. Breaking Bad, Interstellar)..." class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 rounded-2xl text-xs sm:text-sm focus:outline-none focus:border-red-600 transition shadow-lg">
                 <div id="favSuggestions" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-zinc-950 border border-zinc-800 rounded-2xl max-h-60 overflow-y-auto z-50 shadow-2xl"></div>
             </div>
 
+            <!-- Cuadrícula de Favoritas -->
             <div id="favoritesGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
         </div>
 
@@ -133,6 +137,6 @@
         El baúl de fernando — Catálogo y motor de recomendaciones con sincronización en la nube.
     </footer>
 
-    <script src="app.js?v=6.0"></script>
+    <script src="app.js?v=7.0"></script>
 </body>
 </html>
