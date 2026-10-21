@@ -37,8 +37,11 @@ const watchlistGrid = document.getElementById('watchlistGrid');
 const favoritesGrid = document.getElementById('favoritesGrid');
 const genresBar = document.getElementById('genresBar');
 
+// Buscadores
 const favSearchInput = document.getElementById('favSearchInput');
 const favSuggestions = document.getElementById('favSuggestions');
+const watchlistSearchInput = document.getElementById('watchlistSearchInput');
+const watchlistSuggestions = document.getElementById('watchlistSuggestions');
 
 const detailModal = document.getElementById('detailModal');
 const closeModal = document.getElementById('closeModal');
@@ -222,13 +225,74 @@ favSearchInput.addEventListener('input', (e) => {
     }, 250);
 });
 
+// BUSCADOR EN VISTA "POR VER" (MANUAL)
+let watchlistSearchTimeout;
+if (watchlistSearchInput) {
+    watchlistSearchInput.addEventListener('input', (e) => {
+        clearTimeout(watchlistSearchTimeout);
+        const q = e.target.value.trim();
+        if (!q) {
+            watchlistSuggestions.classList.add('hidden');
+            return;
+        }
+
+        watchlistSearchTimeout = setTimeout(async () => {
+            try {
+                const res = await fetch(`${BASE_URL}/search/multi?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                const results = (data.results || []).filter(i => i.media_type === 'movie' || i.media_type === 'tv').slice(0, 6);
+
+                if (results.length === 0) {
+                    watchlistSuggestions.innerHTML = '<div class="p-3 text-xs text-zinc-500">No se encontraron coincidencias.</div>';
+                } else {
+                    watchlistSuggestions.innerHTML = results.map(item => {
+                        const title = item.title || item.name;
+                        const type = item.media_type;
+                        const year = (item.release_date || item.first_air_date || '').split('-')[0];
+                        const poster = item.poster_path ? `${IMG_URL}${item.poster_path}` : '';
+                        const safeTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                        const safePoster = (item.poster_path || '').replace(/'/g, "\\'");
+
+                        return `
+                            <div class="p-2.5 hover:bg-zinc-900 cursor-pointer text-xs flex items-center justify-between border-b border-zinc-900/50 transition gap-2" onclick="addManualToWatchlist(${item.id}, '${type}', '${safeTitle}', '${safePoster}', '${year}')">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    ${poster ? `<img src="${poster}" class="w-7 h-10 object-cover rounded flex-shrink-0">` : `<div class="w-7 h-10 bg-zinc-800 rounded flex-shrink-0"></div>`}
+                                    <div class="truncate">
+                                        <div class="font-bold text-zinc-100 truncate">${title}</div>
+                                        <div class="text-[10px] text-zinc-500">${year || 'N/A'} • ${type === 'tv' ? 'Serie' : 'Película'}</div>
+                                    </div>
+                                </div>
+                                <span class="text-red-500 font-bold whitespace-nowrap text-xs">+ Por Ver</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+                watchlistSuggestions.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+            }
+        }, 250);
+    });
+}
+
+// CERRAR SUGERENCIAS AL HACER CLIC FUERA
 document.addEventListener('click', (e) => {
     if (favSearchInput && favSuggestions && !favSearchInput.contains(e.target) && !favSuggestions.contains(e.target)) {
         favSuggestions.classList.add('hidden');
     }
+    if (watchlistSearchInput && watchlistSuggestions && !watchlistSearchInput.contains(e.target) && !watchlistSuggestions.contains(e.target)) {
+        watchlistSuggestions.classList.add('hidden');
+    }
 });
 
-// GESTIÓN DE FAVORITAS (YA VISTAS)
+// AGREGAR MANUALMENTE A "POR VER" DESDE EL BUSCADOR
+window.addManualToWatchlist = function(id, type, title, poster_path, release_date) {
+    addToWatchlist(id, type, title, poster_path, release_date);
+    if (watchlistSearchInput) watchlistSearchInput.value = '';
+    if (watchlistSuggestions) watchlistSuggestions.classList.add('hidden');
+};
+
+// GESTIÓN DE FAVORITAS
 window.addFavorite = function(id, type, title, poster_path = '', release_date = '') {
     if (myFavorites.some(f => f.id === id && f.type === type)) {
         favSearchInput.value = '';
@@ -344,7 +408,7 @@ function renderWatchlistCatalog() {
         watchlistGrid.innerHTML = `
             <div class="col-span-full text-center py-20 bg-zinc-900/30 rounded-2xl border border-zinc-900 px-4">
                 <p class="text-zinc-400 text-sm font-semibold">Tu lista de pendientes está vacía.</p>
-                <p class="text-zinc-500 text-xs mt-1">Explora las recomendaciones y pulsa "+ Por ver" en las que quieras comenzar.</p>
+                <p class="text-zinc-500 text-xs mt-1">Busca arriba un título para sumarlo o pulsa "+ Por ver" en las recomendaciones.</p>
             </div>
         `;
         return;
